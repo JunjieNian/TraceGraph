@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """SWE-bench Verified causal intervention runner.
 
-Builds on the agentmoe multi-step bash agent.
+Builds on the bundled TraceGraph SWE agent runtime, a MiniSWEAgent-style
+multi-step bash agent.
 Supports two experiment designs:
 
   independent rollout:
@@ -19,16 +20,15 @@ same post-error state. It also supports `shuf_generic` / `shuf_repair` for a
 future 2×2 trigger-source × note-type design.
 
 The trap/core/nontrap libraries come from
-`data/cxcmu/intervention/swebench_*_library.json` (built by
-scripts/107_build_swe_trap_library.py).
+`data/cxcmu/intervention/swebench_*_library.json` or the bundled fallback
+resources in `resources/swebench_detector/`.
 
 Outputs one JSONL row per (instance_id, arm, seed). Patch from the agent is
 saved per-row; the SWE-bench `run_evaluation.py` harness can be invoked later
 to score the patches in a batch.
 
 Usage:
-  PYTHONPATH=/path/to/agentmoe/src:. \\
-  python scripts/108_swe_intervention_runner.py \\
+  python scripts/intervention/swe_runner.py \\
       --instances django__django-12419 astropy__astropy-8707 \\
       --arms placebo tracegraph \\
       --output results/cxcmu/intervention/pilot_swe_smoke.jsonl
@@ -49,24 +49,27 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # --- repo-local imports ---
 from tracegraph.signature import extract_slice_keys, weighted_jaccard
 
-# --- agentmoe imports ---
-try:
-    from agentmoe.agent import Agent, AgentResult, StepRecord, parse_response, strip_thinking
-    from agentmoe.docker_env import DockerEnvironment
-    from agentmoe.model import VLLMModel, ModelResponse
-    from agentmoe.prompts import (
-        make_system_message,
-        make_user_message,
-        make_observation_message,
-    )
-except Exception as exc:
-    raise SystemExit(
-        f"agentmoe import failed: {exc}\n"
-        "Make sure PYTHONPATH includes the agentmoe/src directory."
-    )
+# --- bundled MiniSWEAgent-style runtime ---
+from tracegraph.sweagent import (
+    Agent,
+    AgentResult,
+    DockerEnvironment,
+    ModelResponse,
+    StepRecord,
+    VLLMModel,
+    make_observation_message,
+    make_system_message,
+    make_user_message,
+    parse_response,
+    strip_thinking,
+)
 
 
 import openai
@@ -77,8 +80,8 @@ class DeepSeekModel:
     OpenAI-compatible endpoint that requires a real API key and prefers
     NOT to return token-level logprobs).
 
-    Exposes a `query(messages)` method returning agentmoe.model.ModelResponse,
-    matching the interface agentmoe.agent.Agent expects.
+    Exposes a `query(messages)` method returning `ModelResponse`, matching the
+    interface expected by the bundled TraceGraph SWE agent.
     """
 
     def __init__(
@@ -699,7 +702,7 @@ def _is_check_action(action: str, intent: str, cmd_class: str) -> bool:
 
 
 def encode_step(bash_cmd: str, observation: str, progress: float) -> Set[str]:
-    """Encode an agentmoe SWE step into the cxcmu key alphabet.
+    """Encode a SWE agent step into the cxcmu key alphabet.
 
     The cxcmu library uses TOOL: / ACTION: / CMD: / FILE_PATH: / FILE_EXT: /
     OBS:* keys. We synthesize TOOL:execute_bash + ACTION:<intent> +
@@ -1005,7 +1008,7 @@ def cleanup_snapshot_image(image: Optional[str]) -> None:
 
 
 class InterventionAgent(Agent):
-    """agentmoe.Agent + step-level repair-coaching intervention.
+    """TraceGraph SWE agent + step-level repair-coaching intervention.
 
     Overrides `run()` to inject an intervention prompt after a trap-like
     observation is detected (subject to warmup, cooldown, max_triggers, and
@@ -2484,7 +2487,7 @@ def main():
     ap.add_argument("--model-base-url", default="http://localhost:8192/v1")
     ap.add_argument("--model-name", default="YOUR_MODEL_NAME_OR_PATH")
     ap.add_argument("--api-provider", choices=["vllm", "deepseek", "glm"], default="vllm",
-                    help="vllm = local Qwen via vLLM (uses agentmoe.VLLMModel); "
+                    help="vllm = local model via vLLM (uses tracegraph.sweagent.VLLMModel); "
                          "deepseek = DeepSeek API (uses DeepSeekModel shim); "
                          "glm = Zhipu GLM API (also OpenAI-compatible).")
     ap.add_argument("--api-key", default=None,
@@ -2495,9 +2498,9 @@ def main():
                     help="Per-call max_tokens for the model (None = provider default).")
     ap.add_argument("--timeout", type=int, default=120)
     ap.add_argument("--max-output-chars", type=int, default=15000)
-    ap.add_argument("--container-name-prefix", default="agentmoe",
+    ap.add_argument("--container-name-prefix", default="tracegraph",
                     help="Prefix for docker container names. Use a per-provider "
-                         "prefix (e.g. agentmoe_qwen, agentmoe_deepseek) to allow "
+                         "prefix (e.g. tracegraph_qwen, tracegraph_deepseek) to allow "
                          "multiple providers to run on the same instance in parallel.")
     ap.add_argument("--output", default=str(DEFAULT_OUT))
     ap.add_argument("--prefix-log-output", default=None,

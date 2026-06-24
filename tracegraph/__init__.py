@@ -11,6 +11,7 @@ Modules:
     failure_basins      — failure basin detection + recovery gates
     constants           — all canonical hyperparameters
     dataset             — multi-dataset path helpers + registry
+    sweagent            — bundled MiniSWEAgent-style SWE runtime
 """
 
 __version__ = "0.1.0"

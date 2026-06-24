@@ -83,7 +83,7 @@ diagnosis note.
 ## Repository Structure
 
 ```
-tracegraph/                          # Core library (~2,300 LOC)
+tracegraph/                          # Core library
   constants.py                       #   All hyperparameters (k, sigma, alpha, ...)
   signature.py                       #   Key-set extraction + IDF-weighted Jaccard
   graph_construction.py              #   Mutual-kNN graph + BCC decomposition
@@ -91,6 +91,7 @@ tracegraph/                          # Core library (~2,300 LOC)
   failure_basins.py                  #   Basin/gate/loop detection
   typed_state_mdp.py                 #   Typed-state kernels + mechanism metrics
   dataset.py                         #   Path helpers
+  sweagent/                          #   Bundled MiniSWEAgent-style SWE runtime
 
 scripts/
   pipeline/                          # Build shared landscapes
@@ -139,7 +140,9 @@ pip install -r requirements.txt
 The intervention scripts (`scripts/intervention/`) additionally require:
 - Docker (for SWE-bench environment isolation)
 - A local LLM server (e.g., vLLM) or API access (DeepSeek, GLM)
-- `agentmoe` (SWE-bench agent framework)
+- The bundled `tracegraph.sweagent` runtime; no external agent framework is required
+- `datasets` for loading SWE-bench Verified metadata
+- `swebench` only when evaluating patches with the official harness
 
 See `scripts/intervention/README.md` for setup details.
 
@@ -226,6 +229,10 @@ python scripts/intervention/eval_patches.py \
 # Difference-in-differences analysis
 python scripts/intervention/pool_analysis.py
 ```
+
+Note: the paper experiments used the default chat-completion runner with
+plain `THOUGHT` / `ACTION` text prompting. Harmony/native tool prompting was
+not used in the reported experiments and is not required for reproduction.
 
 ---
 

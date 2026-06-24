@@ -8,7 +8,7 @@ statsmodels>=0.14
 huggingface_hub>=0.16
 
 # Intervention scripts additionally require:
-# litellm
 # openai
+# datasets
 # swebench
 # docker (system package)

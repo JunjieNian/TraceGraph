@@ -22,8 +22,8 @@ dependencies = [
 
 [project.optional-dependencies]
 intervention = [
-    "litellm",
     "openai>=1.0",
+    "datasets>=2.14",
 ]
 
 [tool.setuptools.packages.find]

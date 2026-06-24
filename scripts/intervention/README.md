@@ -14,14 +14,17 @@ In addition to the base `tracegraph` library, SWE intervention scripts require:
 
 ### Python packages
 ```bash
-pip install "tracegraph[intervention]"
+pip install ".[intervention]"
 # Or manually:
-pip install litellm openai
+pip install openai datasets
 ```
 
-### External frameworks
-- **agentmoe** (SWE-bench agent): Add to `PYTHONPATH`.
-- **swebench** (official harness): For patch evaluation.
+### Runtime and evaluation
+- **SWE agent runtime**: Bundled as `tracegraph.sweagent`; no external agent
+  framework or private repository is required.
+- **swebench** (official harness): Install separately when evaluating patches.
+- **Harmony**: Not used in the paper experiments. The released runner uses
+  plain chat-completion `THOUGHT` / `ACTION` prompting.
 
 ### Environment variables
 ```bash

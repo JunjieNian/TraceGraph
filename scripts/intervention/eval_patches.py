@@ -196,7 +196,7 @@ def main() -> None:
     ap.add_argument("--pilot-glob", nargs="+", required=True)
     ap.add_argument("--arms", nargs="+", default=["placebo", "tracegraph", "shuffled"])
     ap.add_argument("--out-dir", default="results/cxcmu/intervention/swe_eval")
-    ap.add_argument("--run-id-prefix", default="agentmoe_pilot")
+    ap.add_argument("--run-id-prefix", default="tracegraph_pilot")
     ap.add_argument("--max-workers", type=int, default=4,
                     help="Parallel swebench docker workers per arm.")
     ap.add_argument("--harness-timeout-sec", type=int, default=180,
