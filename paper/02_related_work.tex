@@ -1,0 +1,20 @@
+\section{Related Work}
+\label{sec:related_work}
+
+\paragraph{Outcome-centered evaluation.}
+Frameworks such as HELM and the LM Evaluation Harness emphasize coverage, transparency, and reproducibility across many tasks and metrics~\citep{liang2023helm,gao2023lmeval}.
+Agent benchmarks bring this apparatus to interactive settings, including software repair, tool use, and general agent environments~\citep{jimenez2024swebench,liu2024agentbench,yao2025taubench}.
+They are indispensable for tracking progress, but their headline artifacts usually summarize final success.
+We reuse the released logs for a complementary purpose: describing the process demands that separate high- and low-outcome trajectories.
+
+\paragraph{Process traces, failure patterns, and intervention.}
+Chain-of-thought and self-consistency showed that sampled traces expose alternative reasoning paths before answers are aggregated~\citep{wei2022cot,wang2023selfconsistency}.
+ReAct, Toolformer, WebShop, and ALFWorld extended this process view to tool use and environment interaction~\citep{yao2023react,schick2023toolformer,yao2022webshop,shridhar2021alfworld}.
+Recent intervention work also treats long-trace failures as actionable: Trap-Aware Adaptive Restart identifies ``thinking traps'' and restarts from earlier reasoning prefixes~\citep{chen2026taar}.
+We study an analogous but distinct setting: tool-using software agents, where trap states are observable action--observation signatures and continuations resume from a live benchmark state.
+
+\paragraph{Graphs as inference programs and measurement objects.}
+Tree-of-Thoughts and Graph-of-Thoughts use graph structure during inference to guide search~\citep{yao2023tree,besta2024graph}.
+Other work uses graphs after generation to cluster chain-of-thought units, analyze trace topology, and model software-agent processes over exploration, localization, patching, validation, and loops~\citep{xiong2025mapping,tan2025shape,liu2026graphectory}.
+A related methodological precedent is \sg{}, a post-hoc atlas of same-answer chain-of-thought route isomerism over hidden activation slices~\citep{chen2026slicegraph}.
+\method{} adopts this graph-as-measurement perspective, but shifts the object to observable agent states, multi-model task graphs, benchmark-level process demand, and trap-triggered recovery on \swe{}.

@@ -1,0 +1,905 @@
+{
+  "domain": "swebench",
+  "kind": "trap",
+  "n_tasks": 50,
+  "n_steps": 24948,
+  "examples": [
+    {
+      "keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:core/ops.py",
+        "OBS:error",
+        "PHASE:early",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:core/ops.py",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "pydata__xarray-6461"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 7
+    },
+    {
+      "keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:ensemble/iforest.py",
+        "OBS:error",
+        "PHASE:mid",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:ensemble/iforest.py",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "scikit-learn__scikit-learn-13496"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 9
+    },
+    {
+      "keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:fields/__init__.py",
+        "OBS:success",
+        "PHASE:early",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:fields/__init__.py",
+        "OBS:success",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-12663"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 7
+    },
+    {
+      "keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:management/base.py",
+        "OBS:error",
+        "PHASE:early",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:management/base.py",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-11292"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 4
+    },
+    {
+      "keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:migrations/writer.py",
+        "OBS:success",
+        "PHASE:late",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:migrations/writer.py",
+        "OBS:success",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-14580"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 10
+    },
+    {
+      "keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:models/constraints.py",
+        "OBS:error",
+        "PHASE:early",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:models/constraints.py",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-11299"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 4
+    },
+    {
+      "keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:models/constraints.py",
+        "OBS:success",
+        "PHASE:late",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:models/constraints.py",
+        "OBS:success",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-11299"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 9
+    },
+    {
+      "keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:models/expressions.py",
+        "OBS:error",
+        "PHASE:mid",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:models/expressions.py",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-13012"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 7
+    },
+    {
+      "keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:operations/models.py",
+        "OBS:success",
+        "PHASE:mid",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:operations/models.py",
+        "OBS:success",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-14999"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 8
+    },
+    {
+      "keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:polys/monomials.py",
+        "OBS:error",
+        "PHASE:late",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:polys/monomials.py",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "sympy__sympy-21847"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 10
+    },
+    {
+      "keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:printing/repr.py",
+        "OBS:success",
+        "PHASE:mid",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:printing/repr.py",
+        "OBS:success",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "sympy__sympy-19346"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 8
+    },
+    {
+      "keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:svm/base.py",
+        "OBS:error",
+        "PHASE:mid",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:edit",
+        "CMD:sed",
+        "FILE_EXT:py",
+        "FILE_PATH:svm/base.py",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "scikit-learn__scikit-learn-14894"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 7
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:combinatorics/perm_groups.py",
+        "PHASE:early",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:combinatorics/perm_groups.py",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "sympy__sympy-19954"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 7
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:crypto/crypto.py",
+        "OBS:error",
+        "OBS:test_passed",
+        "PHASE:early",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:crypto/crypto.py",
+        "OBS:error",
+        "OBS:test_passed",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "sympy__sympy-16886"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 11
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:crypto/crypto.py",
+        "PHASE:late",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:crypto/crypto.py",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "sympy__sympy-16886"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 8
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:ensemble/iforest.py",
+        "PHASE:early",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:ensemble/iforest.py",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "scikit-learn__scikit-learn-13496"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 8
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:fields/__init__.py",
+        "OBS:error",
+        "OBS:test_passed",
+        "PHASE:early",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:fields/__init__.py",
+        "OBS:error",
+        "OBS:test_passed",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-12304"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 4
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:fields/__init__.py",
+        "OBS:error",
+        "PHASE:mid",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:fields/__init__.py",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-12304"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 4
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:fields/__init__.py",
+        "PHASE:mid",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:fields/__init__.py",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-12304",
+        "django__django-12663"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 9
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:flask/blueprints.py",
+        "OBS:test_passed",
+        "PHASE:mid",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:flask/blueprints.py",
+        "OBS:test_passed",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "pallets__flask-5014"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 2
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:handlers/base.py",
+        "OBS:error",
+        "PHASE:late",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:handlers/base.py",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-13810"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 7
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:logic/boolalg.py",
+        "OBS:error",
+        "OBS:traceback",
+        "PHASE:mid",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:logic/boolalg.py",
+        "OBS:error",
+        "OBS:traceback",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "sympy__sympy-23950"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 5
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:logic/boolalg.py",
+        "OBS:error",
+        "PHASE:mid",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:logic/boolalg.py",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "sympy__sympy-23950"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 1
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:management/base.py",
+        "PHASE:late",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:management/base.py",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-11292"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 4
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:models/constraints.py",
+        "OBS:error",
+        "PHASE:early",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:models/constraints.py",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-11299"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 8
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:polys/monomials.py",
+        "OBS:error",
+        "PHASE:early",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:polys/monomials.py",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "sympy__sympy-21847"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 3
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:printing/repr.py",
+        "PHASE:late",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:printing/repr.py",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "sympy__sympy-19346"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 7
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:sets/sets.py",
+        "OBS:error",
+        "PHASE:mid",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:sets/sets.py",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "sympy__sympy-23950"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 7
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:sql/compiler.py",
+        "OBS:error",
+        "PHASE:mid",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:sql/compiler.py",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-13012"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 3
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:sql/compiler.py",
+        "OBS:test_passed",
+        "PHASE:early",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:sql/compiler.py",
+        "OBS:test_passed",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-13012"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 1
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:sql/compiler.py",
+        "PHASE:early",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:sql/compiler.py",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-13012"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 4
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:sql/query.py",
+        "OBS:error",
+        "PHASE:early",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:sql/query.py",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-11299",
+        "django__django-13012"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 10
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:sql/query.py",
+        "PHASE:early",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "FILE_EXT:py",
+        "FILE_PATH:sql/query.py",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-11299",
+        "django__django-13012"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 4
+    },
+    {
+      "keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "OBS:error",
+        "PHASE:early",
+        "TOOL:str_replace_editor"
+      ],
+      "detection_keys": [
+        "ACTION:read",
+        "CMD:cat",
+        "OBS:error",
+        "TOOL:str_replace_editor"
+      ],
+      "task_ids": [
+        "django__django-11299",
+        "pytest-dev__pytest-5631",
+        "scikit-learn__scikit-learn-14894"
+      ],
+      "tool_names": [
+        "str_replace_editor"
+      ],
+      "n_raw": 9
+    },
+    {
+      "keys": [
+        "ACTION:submit",
+        "OBS:success",
+        "OBS:test_passed",
+        "PHASE:late",
+        "TOOL:finish"
+      ],
+      "detection_keys": [
+        "ACTION:submit",
+        "OBS:success",
+        "OBS:test_passed",
+        "TOOL:finish"
+      ],
+      "task_ids": [
+        "sympy__sympy-21847"
+      ],
+      "tool_names": [
+        "finish"
+      ],
+      "n_raw": 3
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "schema": "swebench_trap_diagnosis.v1",
+  "source_trap_library": "data/cxcmu/intervention/swebench_trap_library.json",
+  "n_traps": 35,
+  "families": {
+    "blind_edit_error": {
+      "label": "blind-edit-then-error",
+      "diagnosis": "Past trajectories with this signature applied a sed/replace edit and the next observation contained an error. Do not add another edit yet. Before issuing any further changes: (a) run only the single narrowest failing test that is most directly relevant to what this region of the code does, (b) if the same error persists or a new one appears, REVERT this edit instead of writing a different one, and (c) do not edit any sibling file until the current location is verified to be the right one. Doing less and verifying is safer than doing more."
+    },
+    "blind_edit_silent": {
+      "label": "blind-edit-silent-success",
+      "diagnosis": "Past trajectories with this signature applied an edit that appeared to succeed but then failed the task. Do not stack new edits on top. Before any other change: (a) run only the specific failing test cited by the issue, (b) compare the new failure (if any) to the original failure cited in the issue, (c) if the original failure is identical or unchanged, REVERT this edit and reconsider \u2014 adding more edits will compound the drift. Verify before extending."
+    },
+    "stuck_reading_error": {
+      "label": "stuck-reading-error",
+      "diagnosis": "Past trajectories with this signature kept reading the same region after an error appeared instead of acting on it. Stop reading more. Make exactly ONE minimal edit to the smallest scope implicated by the error you have already seen, then immediately run only the failing test. Do not edit any other file in the same step. If the test outcome is unchanged, REVERT this edit; do not add a second edit."
+    },
+    "misread_partial_success": {
+      "label": "misread-partial-success",
+      "diagnosis": "Past trajectories with this signature treated a partial `test passed` line as global success and submitted. Do not submit yet. Before any submit: (a) identify the specific test (or specific assertion in the issue) that proves the requested behavior changed, (b) run that exact test alone, (c) only if that test passes is the change complete. Do not add or revise edits in the meantime \u2014 verify the current state first."
+    },
+    "aimless_reading": {
+      "label": "aimless-reading",
+      "diagnosis": "Past trajectories with this signature kept exploring instead of acting on what they already knew. Stop exploring. State, in one sentence, the single most likely root cause given the evidence already in front of you, then make ONE minimal edit to the smallest scope implicated by that hypothesis. Run only the narrowest test. Do not open additional files before that test runs; verify before broadening."
+    },
+    "premature_submit": {
+      "label": "premature-submit",
+      "diagnosis": "Past trajectories with this signature submitted on a partial success and then failed the harness. Do not submit yet. Re-read the issue statement and identify the single behavior that must change, then run the test that exercises that behavior specifically. Only submit when that test passes. Do not add edits in the interim \u2014 verify the current state before any further action."
+    },
+    "unknown": {
+      "label": "unknown-low-yield-pattern",
+      "diagnosis": "This pattern fired the trap detector but does not match a known sub-family. Be conservative: do not introduce a new edit on a different file in your next action. Verify the effect of your most recent change first by running the single narrowest relevant test, and revert that change if the test outcome is unchanged."
+    }
+  },
+  "by_trap_index": {
+    "0": "blind_edit_error",
+    "1": "blind_edit_error",
+    "2": "blind_edit_silent",
+    "3": "blind_edit_error",
+    "4": "blind_edit_silent",
+    "5": "blind_edit_error",
+    "6": "blind_edit_silent",
+    "7": "blind_edit_error",
+    "8": "blind_edit_silent",
+    "9": "blind_edit_error",
+    "10": "blind_edit_silent",
+    "11": "blind_edit_error",
+    "12": "aimless_reading",
+    "13": "stuck_reading_error",
+    "14": "aimless_reading",
+    "15": "aimless_reading",
+    "16": "stuck_reading_error",
+    "17": "stuck_reading_error",
+    "18": "aimless_reading",
+    "19": "misread_partial_success",
+    "20": "stuck_reading_error",
+    "21": "stuck_reading_error",
+    "22": "stuck_reading_error",
+    "23": "aimless_reading",
+    "24": "stuck_reading_error",
+    "25": "stuck_reading_error",
+    "26": "aimless_reading",
+    "27": "stuck_reading_error",
+    "28": "stuck_reading_error",
+    "29": "misread_partial_success",
+    "30": "aimless_reading",
+    "31": "stuck_reading_error",
+    "32": "aimless_reading",
+    "33": "stuck_reading_error",
+    "34": "premature_submit"
+  },
+  "family_counts": {
+    "blind_edit_error": 7,
+    "blind_edit_silent": 5,
+    "stuck_reading_error": 12,
+    "misread_partial_success": 2,
+    "aimless_reading": 8,
+    "premature_submit": 1,
+    "unknown": 0
+  },
+  "notes": "All diagnosis text is generic software-engineering advice keyed off the abstract action pattern; it does not read any source task's problem statement, gold patch, or verified-test list."
+}

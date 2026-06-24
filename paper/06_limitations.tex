@@ -1,0 +1,10 @@
+\section{Limitations}
+\label{sec:limitations}
+
+The \method{} landscape roles are outcome-informed, so the framework is an analytical instrument for explaining where high- and low-outcome traffic concentrates, not a blind success predictor.
+The source data contains roughly four passes per model per task across five observational models; shared graphs mitigate sparsity for landscape construction but not for cell-level inference.
+For \mcp{}, a per-task max-normalized continuous reward replaces binarization but treats the per-task maximum as the local ceiling, which it may not be.
+The symbolic signature captures tool, command, observation, file, and phase cues, but may miss fine-grained natural-language semantics, especially for \searchb{}.
+The \method{}-guided recovery pipeline applies only to a structurally selected \swe{} fired subset and three continuation providers, so its gains should be read as local downstream improvements rather than as a universal agent-repair result.
+
+\input{ethics_artifacts}

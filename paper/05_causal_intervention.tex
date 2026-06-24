@@ -1,0 +1,84 @@
+\section{\method{}-Guided Trap-Aware Recovery}
+\label{sec:trap_intervention}
+
+The \method{} analysis asks where high- and low-outcome traffic concentrates on a shared task map.
+We next test whether that map can guide a small recovery pipeline: act only when a live rollout reaches a state resembling historical traps, and use only information already visible in the agent's context.
+Because \S\ref{sec:rq3} shows that \swe{} most strongly demands recovery after trap exposure, we instantiate trap-aware recovery on \swe{} and measure official resolved rate after trap-triggered continuations.
+The goal is not a universal repair algorithm, but a test of whether graph-derived traps identify states where a lightweight, non-oracular continuation change helps.
+
+\begin{table*}[!htbp]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{lc|c|cc}
+\toprule
+\textbf{Provider} & $n_{\text{fired}}$ & \textbf{Baseline} & \textbf{Hot} & \textbf{Note} \\
+ & & {\scriptsize($T{=}0.6$, no note)} & {\scriptsize($T{=}0.9$, no note)} & {\scriptsize($T{=}0.6$, note)} \\
+\midrule
+\multicolumn{5}{c}{\emph{Per-provider fired subset (each provider's own complete set)}} \\
+\midrule
+Qwen3.6-35B-A3B & 214 & 29.4 & 30.8 {\scriptsize\textcolor{gaincolor}{(+1.4)}} & \cellcolor{bestcolor}\textbf{34.1} {\scriptsize\textcolor{gaincolor}{(+4.7)}} \\
+GLM-5.1 & 196 & 48.0 & \cellcolor{bestcolor}\textbf{52.6} {\scriptsize\textcolor{gaincolor}{(+4.6)}} & 49.5 {\scriptsize\textcolor{gaincolor}{(+1.5)}} \\
+DeepSeek-V4-Pro & 206 & 44.7 & \cellcolor{bestcolor}\textbf{48.1} {\scriptsize\textcolor{gaincolor}{(+3.4)}} & 45.6 {\scriptsize\textcolor{gaincolor}{(+1.0)}} \\
+\midrule
+\rowcolor{highlight}
+Pooled (3-prov, $n{=}616$ cells) & 616 & 40.4 & \textbf{43.5} {\scriptsize\textcolor{gaincolor}{(+3.1)}} & 42.9 {\scriptsize\textcolor{gaincolor}{(+2.4)}} \\
+\midrule
+\multicolumn{5}{c}{\emph{Common-fired subset (same 96 instances, all three providers)}} \\
+\midrule
+Qwen3.6-35B-A3B & 96 & 31.2 & 31.2 \phantom{{\scriptsize{(+0.0)}}} & \cellcolor{bestcolor}\textbf{34.4} {\scriptsize\textcolor{gaincolor}{(+3.1)}} \\
+GLM-5.1 & 96 & 50.0 & \cellcolor{bestcolor}\textbf{56.2} {\scriptsize\textcolor{gaincolor}{(+6.2)}} & 52.1 {\scriptsize\textcolor{gaincolor}{(+2.1)}} \\
+DeepSeek-V4-Pro & 96 & 41.7 & \cellcolor{bestcolor}\textbf{46.9} {\scriptsize\textcolor{gaincolor}{(+5.2)}} & 44.8 {\scriptsize\textcolor{gaincolor}{(+3.1)}} \\
+\midrule
+\rowcolor{highlight}
+Pooled (3-prov, $n{=}288$ cells) & 288 & 41.0 & \textbf{44.8} {\scriptsize\textcolor{gaincolor}{(+3.8)}} & 43.8 {\scriptsize\textcolor{gaincolor}{(+2.8)}} \\
+\bottomrule
+\end{tabular}
+\caption{\method{}-guided trap-aware recovery on the full 500-instance \swe{} Verified pool. Cells report official resolved rate (\%); parentheses show paired gain over Baseline. Gains are computed from unrounded paired outcomes, so they may differ by 0.1 pp from subtracting displayed rounded rates. Best non-Baseline cells are bold-shaded. Appendix~\ref{app:trap_intervention_more} reports uncertainty; Appendix~\ref{app:trap_case_studies} gives cases.}
+\label{tab:swe_4arm_intervention}
+\end{table*}
+
+\subsection{From Trap Regions to Runtime Triggers}
+\label{sec:intervention_design}
+
+\method{} converts the trap overlay into a runtime detector by storing canonicalized key sets from trap-side states, such as \texttt{ACTION:edit}, \texttt{OBS:error}, \texttt{TOOL:<name>}, and local file-path cues.
+Generic phase and non-tool keys are stripped so the detector matches recurring failure contexts rather than full traces.
+A second library comes from high-committor non-trap states.
+At a live step $s$, the detector computes the candidate key set $q_s$ and scores
+\begin{align}
+\mathrm{sim}_{\mathrm{trap}}(s) &= \max_{u\in\mathcal{T}} J_{\idf}(q_s,u), \nonumber\\
+\mathrm{sim}_{\mathrm{core}}(s) &= \max_{u\in\mathcal{N}} J_{\idf}(q_s,u),
+\end{align}
+where $\mathcal{T}$ and $\mathcal{N}$ are the trap and non-trap libraries.
+A trigger fires when trap similarity clears a fixed threshold and exceeds core similarity by a margin (Appendix Table~\ref{tab:detector_hparams}).
+For \swe{}, the current step must also carry a local file-path cue, and the candidate action must be an edit or submit action.
+These local checks keep the trigger tied to observable graph signatures while reducing fires on generic exploration.
+
+\subsection{Prefix-Fork Recovery Policy}
+\label{sec:prefix_fork}
+
+When the detector fires, we snapshot the docker workspace and conversation prefix, then continue from that identical state under three policies.
+The no-intervention \emph{Baseline} continues at $T{=}0.6$ with no added note.
+\emph{Hot} raises temperature to $T{=}0.9$ with top-$p{=}0.95$.
+\emph{Note} keeps $T{=}0.6$ and appends a conservative diagnosis note drawn only from the agent's recent log: the last action, observation signal, implicated file or target keys, detector confidence, and a family-level diagnosis.
+The note asks the agent to re-read the failing evidence, localize narrowly, make one minimal change, and revise or discard the edit if the evidence does not support it.
+No arm receives a gold patch, verified-test list, or oracle information.
+
+This prefix-fork design compares the same trap state with no pipeline action, extra sampling diversity, or evidence-grounded localization.
+We report official \swe{} resolved rate in Table~\ref{tab:swe_4arm_intervention}; Appendix~\ref{app:trap_intervention_more} provides paired uncertainty estimates.
+
+\subsection{Downstream Accuracy Improves at Trap-Triggered States}
+\label{sec:swe_intervention}
+
+The experiment uses the full 500-instance \swe{} Verified pool at seed $11$, spanning 12 repositories and three continuation providers not used in the observational graph analysis: Qwen3.6-35B-A3B, GLM-5.1, and DeepSeek-V4-Pro.
+Table~\ref{tab:swe_4arm_intervention} reports each provider's complete fired subset and a common-fired subset of 96 instances where all providers fire and complete all three arms.
+
+\method{}-triggered recovery improves downstream resolution on fired states.
+In the per-provider fired subset, pooled Hot raises resolved rate from $40.4\%$ to $43.5\%$ ($+3.1$ pp, $p{=}0.016$), and pooled Note reaches $42.9\%$ ($+2.4$ pp, $p{=}0.064$).
+The common-fired subset shows the same pattern: Hot increases pooled resolved rate from $41.0\%$ to $44.8\%$ ($+3.8$ pp, $p{=}0.045$).
+Thus a trap region discovered from shared offline trajectories can become a runtime trigger that improves a downstream metric.
+
+The active recovery route is provider-specific: Qwen3.6-35B-A3B benefits most from the diagnosis note ($+4.7$ pp, $p{=}0.036$), while GLM-5.1 ($+4.6$ pp, $p{=}0.037$) and DeepSeek-V4-Pro ($+3.4$ pp) benefit most from the temperature bump.
+
+Appendix~\ref{app:trap_intervention_more} reports the full component statistics and the conservative diagnosis template; Appendix~\ref{app:trap_case_studies} gives case studies showing how the same trigger state can lead to different provider-specific recoveries.

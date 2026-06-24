@@ -1,0 +1,16 @@
+{
+  "sources": [
+    {
+      "usage": "toplevel",
+      "filename": "main.tex"
+    },
+    {
+      "usage": "ignore",
+      "filename": "references.bib"
+    }
+  ],
+  "spec_version": 1,
+  "process": {
+    "compiler": "pdflatex"
+  }
+}

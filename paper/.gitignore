@@ -1,0 +1,17 @@
+# LaTeX aux
+*.aux
+*.log
+*.out
+*.blg
+*.bbl
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.synctex(busy)
+
+# Compiled PDF (keep figures/*.pdf)
+main.pdf
+
+# Diff files
+*.diff
+*.patch

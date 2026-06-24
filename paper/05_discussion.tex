@@ -1,0 +1,13 @@
+\section{Discussion and Conclusion}
+\label{sec:discussion}
+
+\method{} is neither another scalar score nor a blind success predictor.
+Its outcome-informed core and trap regions are descriptive: they show where successful and failed traffic concentrates on a shared map, turning each rollout into a process reading over Access, Trap exposure, and Repair.
+This exposes differences hidden by aggregate scores.
+DeepSeek-V3.2 is the clearest high-access, high-repair model, Qwen3-Next is conservative and shallow, and other models lie between them (\S\ref{sec:rq2}).
+Benchmarks also impose different process demands: \taub{} is strongly trap-averse, \mcp{} and \terminal{} are negative on Trap, \swe{} adds Repair demand, and \searchb{} mainly rewards productive evidence access (\S\ref{sec:rq3}).
+Thus, benchmark difficulty is better understood as a mixture of exploration, avoidance, and recovery demands rather than a hidden factor.
+
+The recovery experiment shows that this map can guide a small downstream intervention without becoming a full controller.
+Graph-derived traps trigger prefix-fork continuations only when a live \swe{} rollout enters a historical failure region.
+On fired states from the 500-instance \swe{} Verified pool, the best pooled single-factor policy raises resolved rate by $+3.1$ points on the per-provider fired subset and by $+3.8$ points on common-fired instances .

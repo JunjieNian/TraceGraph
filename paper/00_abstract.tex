@@ -1,0 +1,11 @@
+% ======================================================================
+% Abstract
+% ======================================================================
+Agent benchmarks increasingly record rich interaction trajectories, yet evaluation often reduces each rollout to a pass rate or reward score.
+We introduce \method{}, a graph-based framework that turns released multi-model agent trajectories into \emph{shared decision landscapes}.
+For each task, \method{} builds a graph over observable action--observation states from pooled rollouts before model identity is introduced.
+It then overlays outcome-informed productive cores and trap regions, and summarizes each rollout with three events: Access, Trap exposure, and Repair.
+Across trajectories spanning five benchmark splits, \method{} profiles reveal navigation differences hidden by aggregate scores and show that splits differ in whether they reward avoiding traps or recovering from them.
+The same \method{} landscape also motivates a trap-aware recovery pipeline for \swe{}: a runtime detector fires on states matching historical trap regions, then lightweight continuation policies are evaluated from the same prefix.
+On fired states, the best pooled single-factor policy raises official resolved rate from $40.4\%$ to $43.5\%$ on the per-provider fired subset and from $41.0\%$ to $44.8\%$ on common-fired instances, with provider-specific active components.
+Overall, \method{} provides a process vocabulary for asking what agent benchmarks test, where models diverge on a shared landscape, and how failure regions can guide downstream improvement.

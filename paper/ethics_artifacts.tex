@@ -1,0 +1,36 @@
+\paragraph{Potential risks.}
+\method{} is an analysis and evaluation framework, not a deployed agent-control system.
+The main risks are over-interpreting outcome-informed graph roles as blind predictors of success, overfitting recovery policies to benchmark-specific traps, or using automated software-editing agents without human review.
+We mitigate these risks by presenting the recovery pipeline as a local benchmark intervention on fired \swe{} states, using no gold patches or verified-test lists in the recovery note, reporting provider-specific behavior, and avoiding any deployment recommendation.
+
+\paragraph{Artifacts, licenses, and intended use.}
+We use access-controlled or provider-served research artifacts: the gated cx-cmu agent trajectory release on Hugging Face, the underlying benchmark suites and evaluation harnesses, and the three continuation models cited in \S\ref{sec:data} and \S\ref{sec:trap_intervention}.
+The public card for the cx-cmu release gates file access behind contact sharing, and the public README does not list a separate dataset license or a detailed citation block.
+We therefore cite the dataset card directly, treat the trajectories as access-controlled research material, and use them only for the analysis reported in this paper.
+For the recovery study, GLM-5.1 and DeepSeek-V4-Pro are accessed through provider APIs under provider terms, while Qwen3.6-35B-A3B is run locally from Qwen-family weights whose public model card lists the Apache-2.0 license.
+We do not redistribute raw trajectories, benchmark instances, source repositories, model weights, or API outputs.
+Our intended use is research evaluation and process analysis of agent benchmarks, and any future sharing of derived artifacts would need to respect the access conditions of the source artifacts.
+
+\paragraph{Privacy, content, and data handling.}
+We do not collect new personal data, infer demographic attributes, or conduct user profiling.
+The source artifacts consist of benchmark tasks, model-generated traces, tool outputs, repository paths, issue statements, and synthetic or benchmark-specific environment records.
+We inspected the schema and representative examples for fields that directly name or identify people, and the analysis converts textual fields into canonicalized symbolic keys such as tool type, command class, observation pattern, file cue, and phase cue.
+The paper reports aggregate statistics and illustrative benchmark snippets rather than raw private user conversations.
+
+\paragraph{Computation and reproducibility.}
+We do not train or fine-tune models.
+Graph construction, annotation analysis, bootstrapping, and table generation use custom scripts over fixed symbolic signatures and fixed hyperparameters reported in \S\ref{sec:method} and Appendix~\ref{tab:hyperparams_full}.
+The recovery experiment uses two API-served continuation providers (GLM-5.1 and DeepSeek-V4-Pro) and one locally hosted continuation model (Qwen3.6-35B-A3B).
+Provider-side infrastructure for the API models is not observable to us, so we report model/provider names, data sizes, fired subsets, temperatures, top-$p$ values, confidence intervals, and permutation tests rather than provider GPU hours.
+The locally hosted Qwen3.6-35B-A3B runs on a single NVIDIA H20 GPU, and the Qwen intervention sweep consumed approximately ten GPU-hours in total.
+
+\paragraph{Human annotation.}
+The graph-interpretability sanity checks use two internal annotators rather than crowdworkers or recruited human subjects.
+The annotators were given task-level trajectory fragments and asked to judge within- vs. across-block similarity, articulation phase changes, and whether core/trap blocks correspond to productive progress or low-outcome exploration.
+No external participants were recruited or paid, no annotator personal data were collected, and the annotation is used only as a sanity check for graph interpretability.
+The full instruction text is in Appendix~\ref{app:annotation_guidelines}.
+
+\paragraph{AI assistance.}
+AI assistants were used for language polishing, LaTeX editing, patch preparation, and submission-checklist drafting.
+The authors supplied the research ideas, experimental design, data analysis, and claims, and manually verified all citations, numerical results, and final text.
+No AI assistant is treated as an author.
