@@ -1,82 +1,61 @@
-# TraceGraph
-
-**TraceGraph: Shared Decision Landscapes for Diagnosing and Improving Agent Trajectories**
-
-Junjie Nian\*, Kang Chen\*, Ge Zhang, Yixin Cao, Yugang Jiang
-
-Fudan University, ByteDance, Shanghai Innovation Institute
-
-Current release: **v0.1.0**.
+# TraceGraph: Shared Decision Landscapes for Diagnosing and Improving Agent Trajectories
 
 <p align="center">
-  <img src="paper/figures/pipeline.png" width="90%" />
+  <a href="https://arxiv.org/abs/2605.31308"><img src="https://img.shields.io/badge/arXiv-2605.31308-b31b1b.svg" alt="arXiv"></a>
+  <a href="https://github.com/JunjieNian/TraceGraph/releases/tag/v0.1.0"><img src="https://img.shields.io/badge/release-v0.1.0-2ea44f.svg" alt="Release"></a>
+  <a href="#license"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License"></a>
 </p>
 
----
+<p align="center">
+  <b>Junjie Nian*</b> &nbsp;&nbsp;
+  <b>Kang Chen*</b> &nbsp;&nbsp;
+  Ge Zhang &nbsp;&nbsp;
+  Yixin Cao &nbsp;&nbsp;
+  Yugang Jiang
+  <br>
+  Fudan University &nbsp;·&nbsp; ByteDance &nbsp;·&nbsp; Shanghai Innovation Institute
+  <br>
+  (* equal contribution)
+</p>
 
-## Core Idea
+<p align="center">
+  <a href="https://arxiv.org/abs/2605.31308">[Paper]</a> &nbsp;|&nbsp;
+  <a href="#installation">[Install]</a> &nbsp;|&nbsp;
+  <a href="#usage">[Usage]</a> &nbsp;|&nbsp;
+  <a href="#intervention-trap-aware-recovery">[Intervention]</a> &nbsp;|&nbsp;
+  <a href="#repository-structure">[Code Map]</a>
+</p>
 
-Agent benchmarks reduce rich trajectories to single scalars (pass/fail, reward),
-hiding the diverse *process* patterns underneath. Two models can score identically
-yet fail for completely different reasons: one never inspects the right file, the
-other finds it but applies a broken patch.
+## Pipeline
 
-TraceGraph addresses this by:
+<p align="center">
+  <img src="paper/figures/pipeline.png" width="95%" alt="TraceGraph pipeline">
+</p>
 
-1. **Building shared decision landscapes** from pooled multi-model rollouts
-   (model identity is excluded during construction, added only afterward)
-2. **Overlaying outcome information** to identify productive cores and trap regions
-3. **Defining three rollout events** (Access, Trap exposure, Repair) that decompose
-   model behavior into interpretable supply and benchmark demands
-4. **Triggering recovery at runtime** when the live agent enters a graph-derived
-   trap state
+**TraceGraph** builds a shared decision landscape from pooled multi-model agent rollouts. It turns action-observation traces into a mutual-kNN graph, discovers productive cores and trap regions through outcome-aware diffusion, and uses the resulting graph signals to diagnose and improve live SWE-bench agents.
 
----
+## Why TraceGraph?
 
-## Method Overview
+Agent benchmarks usually collapse a rich trajectory into a single scalar such as pass/fail or reward. TraceGraph keeps the **process geometry**: where agents go, which states they share, where they get trapped, and how successful runs recover.
 
-### Stage 1: Shared Landscape Construction
+TraceGraph provides four complementary views:
 
-Each action-observation step is encoded as a sparse **key set** from 7 symbolic
-channels (tool name, action type, command class, observation pattern, file cues,
-temporal phase, search-specific keys). Steps are compared via **IDF-weighted
-Jaccard similarity** and connected into a **mutual-k-NN graph**. The graph is
-decomposed into **Biconnected Components (BCCs)** that serve as coarse shared
-agent states, with articulation points marking strategy transitions.
+| View | Question | Output |
+|------|----------|--------|
+| **Shared landscape** | Which decision states are shared across models and tasks? | A mutual-kNN / BCC process atlas built without model identity |
+| **Outcome overlay** | Which regions lead toward success or failure? | Diffused reward fields, productive cores, trap regions, basins, and gates |
+| **Process profile** | What does each model supply, and what does each benchmark demand? | Access / Trap / Repair events with supply-demand decomposition |
+| **Runtime recovery** | Can graph-derived traps improve downstream agents? | SWE-bench prefix-fork interventions with detector-guided repair notes |
 
-### Stage 2: Outcome Overlays
+## Method at a Glance
 
-Each BCC block receives a Laplace-smoothed reward seed based on visiting
-rollouts' outcomes. Seeds are propagated via **personalized PageRank diffusion**
-over the block quotient graph. High-field blocks form **productive cores**;
-low-field blocks form **trap regions**. Failure basins (connected trap clusters
-with low escape probability) and recovery gates (blocks connecting basins to
-cores with success uplift) are identified.
+1. **Encode steps** as sparse symbolic key sets over tool use, action intent, command class, file cues, observation patterns, temporal phase, and search cues.
+2. **Build shared graphs** with IDF-weighted Jaccard similarity, mutual-kNN edges, and biconnected-component decomposition.
+3. **Propagate outcomes** with personalized PageRank to identify high-value cores, low-value traps, failure basins, and recovery gates.
+4. **Measure behavior** through Access, Trap exposure, and Repair events, then aggregate model supply vectors and benchmark demand vectors.
+5. **Intervene on SWE-bench** by triggering a trap-aware recovery note when a live agent enters a graph-derived trap state.
 
-### Stage 3: Process Profiles
-
-Three binary rollout events are extracted per trajectory:
-
-| Event | Definition |
-|-------|-----------|
-| **Access** (A) | Did the rollout visit any productive core block? |
-| **Trap** (E) | Did the rollout visit any trap block? |
-| **Repair** (R) | Did the rollout escape a trap block to reach a core? |
-
-These events are aggregated into:
-- **Model supply vectors**: task-centered residuals showing each model's event
-  propensity relative to peers on the same tasks
-- **Benchmark demand vectors**: reward-weighted contrast showing which events
-  separate successful from failed traffic on each benchmark
-
-### Stage 4: Trap-Aware Recovery (Intervention)
-
-Graph-derived trap key sets are stored in a **detector library**. At runtime,
-each agent step's key set is compared against the library via IDF-weighted
-Jaccard. When trap similarity exceeds a threshold (with a margin over core
-similarity), a **prefix-fork** is triggered: the agent state is checkpointed,
-and continuation proceeds with either a temperature bump or an evidence-grounded
-diagnosis note.
+The released intervention runner includes a bundled MiniSWEAgent-style runtime under `tracegraph.sweagent`; no private agent framework is required. The paper experiments used plain chat-completion `THOUGHT` / `ACTION` prompting, not Harmony/native tool prompting.
 
 ---
 
@@ -229,10 +208,6 @@ python scripts/intervention/eval_patches.py \
 # Difference-in-differences analysis
 python scripts/intervention/pool_analysis.py
 ```
-
-Note: the paper experiments used the default chat-completion runner with
-plain `THOUGHT` / `ACTION` text prompting. Harmony/native tool prompting was
-not used in the reported experiments and is not required for reproduction.
 
 ---
 
