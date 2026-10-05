@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://arxiv.org/abs/2605.31308"><img src="https://img.shields.io/badge/arXiv-2605.31308-b31b1b.svg" alt="arXiv"></a>
-  <a href="https://github.com/JunjieNian/TraceGraph/releases/tag/v0.1.0"><img src="https://img.shields.io/badge/release-v0.1.0-2ea44f.svg" alt="Release"></a>
+  <a href="https://github.com/JunjieNian/TraceGraph/releases/tag/v0.1.1"><img src="https://img.shields.io/badge/release-v0.1.1-2ea44f.svg" alt="Release"></a>
   <a href="#license"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License"></a>
 </p>
 

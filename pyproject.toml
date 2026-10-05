@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tracegraph"
-version = "0.1.0"
+version = "0.1.1"
 description = "Shared decision landscapes for analyzing and improving agent trajectories"
 readme = "README.md"
 license = {text = "Apache-2.0"}
