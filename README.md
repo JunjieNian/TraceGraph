@@ -209,6 +209,32 @@ python scripts/intervention/eval_patches.py \
 python scripts/intervention/pool_analysis.py
 ```
 
+### Reproducing the paper's numbers
+
+Three details decide whether a rerun matches the published tables.
+
+**MCPBench uses a reward-weighted seed.** MCPBench records a continuous
+multi-criteria score, so the reward-weighted analogue is used consistently
+for it: the block seed averages the per-task max-normalised reward of the
+visiting runs, and the demand contrast is reward-weighted. Splits listed in
+`CONTINUOUS_REWARD_BENCHMARKS` take this path automatically in
+`compute_reward_field.py`. Seeding MCPBench with the binary resolved
+fraction instead yields `+0.128 / -0.164 / +0.006` rather than the published
+`+0.216 / -0.166 / +0.020`.
+
+**The recovery detector fires on similarity plus local gates.** A trigger
+requires the trap-similarity threshold together with the warmup, cooldown,
+edit/submit intent, and file-locality gates in
+`resources/swebench_detector/`. The trap-versus-reference margin is recorded
+per step for bookkeeping and does not gate firing. Note also that
+exception-shaped observation keys match on source text the agent has read,
+not only on runtime tracebacks.
+
+**Neighbour ties are not bit-reproducible across NumPy versions.** Signature
+key sets rebuild byte-identically, but `argpartition` orders equidistant
+neighbours differently across versions. Sorted per-row distances are
+unchanged; the residual noise on demand cells is about `±0.015`.
+
 ---
 
 ## Key Hyperparameters

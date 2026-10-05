@@ -20,6 +20,11 @@ PROPAGATION_STEPS = 24       # number of diffusion iterations T
 SUPPORT_SHRINK_EXP = 0.5     # support-shrinkage exponent β
 CORE_POS_Q = 0.75            # positive-quantile threshold for core mask
 MIN_RUN_SUPPORT = 3          # minimum visiting runs for a block to receive a seed
+# Splits whose recorded reward is continuous rather than a pass/fail flag.
+# For these the block seed averages the per-task max-normalised reward of
+# the visiting runs, matching the reward-weighted demand contrast; using a
+# binary seed here does NOT reproduce the published MCPBench demand row.
+CONTINUOUS_REWARD_BENCHMARKS = ("mcpbench",)
 
 # ── Process families (adapted from SliceGraph §3.3) ──────────────
 JACCARD_THRESHOLD = 0.05     # minimum weighted-Jaccard for an edge

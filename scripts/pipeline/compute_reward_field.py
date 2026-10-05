@@ -24,15 +24,18 @@ from tqdm import tqdm
 
 from tracegraph.constants import (
     CORE_POS_Q,
+    CONTINUOUS_REWARD_BENCHMARKS,
     MIN_RUN_SUPPORT,
     PROPAGATION_ALPHA,
     PROPAGATION_STEPS,
     SUPPORT_SHRINK_EXP,
 )
 from tracegraph.graph_construction import nontrivial_blocks
+from tracegraph.dataset import load_parsed_outcomes
 from tracegraph.reward_field import (
     build_block_graph,
     build_run_resolved,
+    build_run_scores,
     build_transition_matrix,
     build_visit_sets,
     compute_seed_vector,
@@ -43,14 +46,16 @@ from tracegraph.reward_field import (
 )
 
 GRAPH_DIR = Path("data/cxcmu/graphs")
+PARSED_DIR = Path("data/cxcmu/parsed")
 RESULTS_DIR = Path("results/cxcmu/reward_field")
 
 
 def _set_data_root(data_root: Path, results_root: Optional[Path] = None) -> None:
-    """Re-point GRAPH_DIR and (optionally) RESULTS_DIR."""
-    global GRAPH_DIR, RESULTS_DIR
+    """Re-point GRAPH_DIR, PARSED_DIR and (optionally) RESULTS_DIR."""
+    global GRAPH_DIR, PARSED_DIR, RESULTS_DIR
     data_root = Path(data_root)
     GRAPH_DIR = data_root / "graphs"
+    PARSED_DIR = data_root / "parsed"
     if results_root is not None:
         RESULTS_DIR = Path(results_root) / "reward_field"
 
@@ -105,12 +110,23 @@ def main(max_tasks: int | None = None, benchmark: str | None = None):
             # Transition matrix
             P, node_to_idx = build_transition_matrix(nodes, block_adj)
 
-            # Seed vector (global)
+            # Seed vector (global).  Continuous-reward splits use the
+            # reward-weighted analogue throughout, so the block seed averages
+            # the per-task max-normalised reward of the visiting runs; a binary
+            # seed here does not reproduce the published MCPBench demand row.
+            if bench in CONTINUOUS_REWARD_BENCHMARKS:
+                run_outcomes = build_run_scores(
+                    payload,
+                    load_parsed_outcomes(PARSED_DIR / bench / f"{task_id}.jsonl"),
+                    run_ids=sorted(run_sequences),
+                )
+            else:
+                run_outcomes = run_resolved
             seed = compute_seed_vector(
                 run_id=None,
                 nodes=nodes,
                 block_run_sets=block_run_sets,
-                run_resolved=run_resolved,
+                run_outcomes=run_outcomes,
                 min_run_support=max(1, MIN_RUN_SUPPORT),
                 support_shrink_exp=SUPPORT_SHRINK_EXP,
             )
