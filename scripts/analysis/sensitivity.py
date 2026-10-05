@@ -1,42 +1,42 @@
 #!/usr/bin/env python3
-"""S1-S5 sensitivity + bootstrap CI for paper Tables 2 and 3.
+"""Bootstrap CIs and threshold sweeps for the supply and demand profiles.
 
 Reads existing graph payloads in data/cxcmu/graphs/<bench>/<task>.pkl and
 parsed rollouts in data/cxcmu/parsed/<bench>/<task>.jsonl. NO graph rebuild.
 
 Outputs all into results/cxcmu/sensitivity/:
-  supply_ci.json            S1 — bootstrap CI on each S_{m,a}
-  demand_ci.json            S2 — bootstrap CI on each D_{b,a}
-  trap_quantile_sweep.json  S3 — sweep over trap quantile
-  core_quantile_sweep.json  S4 — sweep over core quantile (re-derived from field)
-  laplace_sweep.json        S5 — sweep over Laplace constant in q_t(g)
+  baseline_point.json       supply and demand at the default thresholds
+  supply_ci.json            bootstrap CI on each S_{m,z}
+  demand_ci.json            bootstrap CI on each D_{q,z}
+  trap_quantile_sweep.json  sweep over the trap quantile
+  core_quantile_sweep.json  sweep over the core quantile (re-derived from field)
 
 CI / bootstrap design:
-  Supply (S_{m,a}): bootstrap unit = (benchmark, task). On each resample, recompute
-    a_{m,t} and the task-centered residual, then the model average.
-  Demand (D_{b,a}): bootstrap unit = rollout within benchmark; the reward-weighted
-    contrast is recomputed on each resample.
+  Supply (S_{m,z}): bootstrap unit = (benchmark, task). On each resample,
+    recompute the cell means z_{m,t} and the task-centered residual, then
+    the model average.
+  Demand (D_{q,z}): bootstrap unit = rollout within benchmark; the
+    reward-weighted contrast is recomputed on each resample.
   B = 2000 resamples (default).
 
-Sweeps share the same pipeline as script 100 but vary the corresponding parameter;
-each setting produces one supply table and one demand table.
+Sweeps share the event definitions of scripts/pipeline/rollout_events.py but
+vary the corresponding quantile; each setting produces one supply table and
+one demand table.
 """
 from __future__ import annotations
 
 import argparse
-import glob
 import json
 import pickle
 import random
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
 from tracegraph.reward_field import (
     build_run_resolved,
-    nontrivial_block_info,
     reconstruct_run_sequences,
 )
 
@@ -48,9 +48,8 @@ OUT_DIR = Path("results/cxcmu/sensitivity")
 # Defaults match the paper main text
 TRAP_Q_DEFAULT = 0.25
 CORE_Q_DEFAULT = 0.75
-LAPLACE_DEFAULT = 0.5
 
-ARMS = ("A_r", "E_r", "R_r", "G_r")
+ARMS = ("A_r", "E_r", "R_r")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -113,10 +112,6 @@ def compute_core_mask(field: np.ndarray, quantile: float) -> np.ndarray:
     return np.logical_and(field > 0, field >= thr)
 
 
-def gate_block_set(block_meta: Dict[int, dict]) -> set:
-    return {int(bid) for bid, m in block_meta.items() if m.get("has_articulation")}
-
-
 def compact_block_sequence(steps: List[dict]) -> List[int]:
     out: List[int] = []
     for step in steps:
@@ -136,7 +131,6 @@ def process_task(payload: dict, parsed_lookup: Dict[str, Dict[str, Any]],
                  *,
                  trap_quantile: float = TRAP_Q_DEFAULT,
                  core_quantile: Optional[float] = None,  # None = use baked core_mask
-                 laplace: float = LAPLACE_DEFAULT,
                  benchmark: str = "",
                  task_id: str = "") -> List[Dict[str, Any]]:
     rf = payload.get("reward_field") or {}
@@ -154,9 +148,6 @@ def process_task(payload: dict, parsed_lookup: Dict[str, Dict[str, Any]],
 
     core_blocks = {int(nodes[i]) for i, c in enumerate(core_arr) if c}
     trap_blocks = {int(nodes[i]) for i, c in enumerate(trap_arr) if c}
-    block_meta = nontrivial_block_info(payload)
-    gate_blocks = gate_block_set(block_meta)
-
     run_sequences = reconstruct_run_sequences(payload)
     if not run_sequences:
         return []
@@ -168,7 +159,7 @@ def process_task(payload: dict, parsed_lookup: Dict[str, Dict[str, Any]],
         rid_to_runstr = {i: str(s) for i, s in enumerate(unique_runs)}
 
     run_resolved = build_run_resolved(payload)
-    rollouts: List[Dict[str, Any]] = []
+    out: List[Dict[str, Any]] = []
     for rid, steps in run_sequences.items():
         rs = rid_to_runstr.get(int(rid))
         if rs is None:
@@ -197,36 +188,10 @@ def process_task(payload: dict, parsed_lookup: Dict[str, Dict[str, Any]],
                     R_r = 1
                     break
 
-        visited_gates = sorted(visit_set & gate_blocks)
-        rollouts.append({
-            "rid": int(rid), "run_str": rs, "model_id": model_id, "y_r": y_r,
-            "A_r": A_r, "E_r": E_r, "R_r": R_r,
-            "visited_gates": visited_gates,
-        })
-
-    # gate map
-    gate_num: Dict[int, float] = defaultdict(float)
-    gate_den: Dict[int, int] = defaultdict(int)
-    for r in rollouts:
-        for g in r["visited_gates"]:
-            gate_num[int(g)] += float(r["y_r"])
-            gate_den[int(g)] += 1
-    q_g: Dict[int, float] = {}
-    for g, n in gate_den.items():
-        q_g[int(g)] = (gate_num[g] + laplace) / (n + 2.0 * laplace)
-
-    out: List[Dict[str, Any]] = []
-    for r in rollouts:
-        if r["visited_gates"]:
-            vals = [q_g[int(g)] for g in r["visited_gates"] if int(g) in q_g]
-            G_r = float(np.mean(vals)) if vals else None
-        else:
-            G_r = None
         out.append({
             "benchmark": benchmark, "task_id": task_id,
-            "model_id": r["model_id"], "run_str": r["run_str"],
-            "y_r": r["y_r"], "A_r": r["A_r"], "E_r": r["E_r"], "R_r": r["R_r"],
-            "G_r": G_r, "visited_gate": G_r is not None,
+            "model_id": model_id, "run_str": rs,
+            "y_r": y_r, "A_r": A_r, "E_r": E_r, "R_r": R_r,
         })
     return out
 
@@ -373,7 +338,6 @@ def bootstrap_demand(rows: List[Dict[str, Any]], B: int, seed: int) -> Dict[str,
 def collect_rows(*,
                  trap_quantile: float = TRAP_Q_DEFAULT,
                  core_quantile: Optional[float] = None,
-                 laplace: float = LAPLACE_DEFAULT,
                  max_tasks_per_bench: Optional[int] = None) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     for bench_dir in sorted(GRAPH_DIR.iterdir()):
@@ -393,7 +357,6 @@ def collect_rows(*,
             rows.extend(process_task(payload, parsed_lookup,
                                       trap_quantile=trap_quantile,
                                       core_quantile=core_quantile,
-                                      laplace=laplace,
                                       benchmark=bench,
                                       task_id=task_id))
     return rows
@@ -404,9 +367,9 @@ def main() -> None:
     ap.add_argument("--B", type=int, default=2000, help="bootstrap resamples")
     ap.add_argument("--seed", type=int, default=20260521)
     ap.add_argument("--skip-bootstrap", action="store_true",
-                    help="skip S1/S2 bootstrap CIs (sweeps only)")
+                    help="skip the bootstrap CIs (sweeps only)")
     ap.add_argument("--skip-sweeps", action="store_true",
-                    help="skip S3/S4/S5 sweeps (bootstrap only)")
+                    help="skip the quantile sweeps (bootstrap only)")
     ap.add_argument("--max-tasks-per-bench", type=int, default=0)
     args = ap.parse_args()
     max_tasks = args.max_tasks_per_bench if args.max_tasks_per_bench > 0 else None
@@ -421,8 +384,8 @@ def main() -> None:
               open(OUT_DIR / "baseline_point.json", "w"), indent=2)
 
     if not args.skip_bootstrap:
-        # ── S1: supply bootstrap ──────────────────────────────────────────────
-        print(f"S1: supply bootstrap (B={args.B})", flush=True)
+        # ── Supply bootstrap ──────────────────────────────────────────────────
+        print(f"supply bootstrap (B={args.B})", flush=True)
         sup_ci = bootstrap_supply(rows, args.B, args.seed)
         json.dump({"point": sup0, "ci": sup_ci},
                   open(OUT_DIR / "supply_ci.json", "w"), indent=2)
@@ -433,8 +396,8 @@ def main() -> None:
                 hi = sup_ci.get(m, {}).get(ev, {}).get("hi95", float("nan"))
                 print(f"  {m:20s} {ev}: {p:+.3f}  CI95=[{lo:+.3f}, {hi:+.3f}]")
 
-        # ── S2: demand bootstrap ──────────────────────────────────────────────
-        print(f"S2: demand bootstrap (B={args.B})", flush=True)
+        # ── Demand bootstrap ──────────────────────────────────────────────────
+        print(f"demand bootstrap (B={args.B})", flush=True)
         dem_ci = bootstrap_demand(rows, args.B, args.seed)
         json.dump({"point": dem0, "ci": dem_ci},
                   open(OUT_DIR / "demand_ci.json", "w"), indent=2)
@@ -446,8 +409,8 @@ def main() -> None:
                 print(f"  {b:14s} {ev}: {p:+.3f}  CI95=[{lo:+.3f}, {hi:+.3f}]")
 
     if not args.skip_sweeps:
-        # ── S3: trap quantile sweep ───────────────────────────────────────────
-        print("S3: trap quantile sweep", flush=True)
+        # ── Trap quantile sweep ───────────────────────────────────────────────
+        print("trap quantile sweep", flush=True)
         s3: Dict[str, Any] = {}
         for q in (0.10, 0.20, 0.25, 0.30, 0.50):
             rows_q = collect_rows(trap_quantile=q, max_tasks_per_bench=max_tasks)
@@ -456,8 +419,8 @@ def main() -> None:
             print(f"  q={q}: collected {len(rows_q)} rollouts", flush=True)
         json.dump(s3, open(OUT_DIR / "trap_quantile_sweep.json", "w"), indent=2)
 
-        # ── S4: core quantile sweep ───────────────────────────────────────────
-        print("S4: core quantile sweep", flush=True)
+        # ── Core quantile sweep ───────────────────────────────────────────────
+        print("core quantile sweep", flush=True)
         s4: Dict[str, Any] = {}
         for q in (0.50, 0.65, 0.75, 0.85, 0.90):
             rows_q = collect_rows(core_quantile=q, max_tasks_per_bench=max_tasks)
@@ -465,16 +428,6 @@ def main() -> None:
             s4[f"q={q}"] = {"supply": sup, "demand": dem}
             print(f"  q={q}: collected {len(rows_q)} rollouts", flush=True)
         json.dump(s4, open(OUT_DIR / "core_quantile_sweep.json", "w"), indent=2)
-
-        # ── S5: Laplace sweep ────────────────────────────────────────────────
-        print("S5: Laplace constant sweep", flush=True)
-        s5: Dict[str, Any] = {}
-        for lam in (0.0, 0.25, 0.5, 1.0, 2.0):
-            rows_l = collect_rows(laplace=lam, max_tasks_per_bench=max_tasks)
-            sup, dem = supply_demand_from_rollouts(rows_l)
-            s5[f"lambda={lam}"] = {"supply": sup, "demand": dem}
-            print(f"  λ={lam}: collected {len(rows_l)} rollouts", flush=True)
-        json.dump(s5, open(OUT_DIR / "laplace_sweep.json", "w"), indent=2)
 
     print(f"\nwrote outputs to {OUT_DIR}", flush=True)
 

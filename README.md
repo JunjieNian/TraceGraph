@@ -22,7 +22,7 @@
   <a href="https://arxiv.org/abs/2605.31308">[Paper]</a> &nbsp;|&nbsp;
   <a href="#installation">[Install]</a> &nbsp;|&nbsp;
   <a href="#usage">[Usage]</a> &nbsp;|&nbsp;
-  <a href="#intervention-trap-aware-recovery">[Intervention]</a> &nbsp;|&nbsp;
+  <a href="#intervention-swe-bench-recovery">[Intervention]</a> &nbsp;|&nbsp;
   <a href="#repository-structure">[Code Map]</a>
 </p>
 
@@ -32,30 +32,15 @@
   <img src="paper/figures/pipeline.png" width="95%" alt="TraceGraph pipeline">
 </p>
 
-**TraceGraph** builds a shared decision landscape from pooled multi-model agent rollouts. It turns action-observation traces into a mutual-kNN graph, discovers productive cores and trap regions through outcome-aware diffusion, and uses the resulting graph signals to diagnose and improve live SWE-bench agents.
-
-## Why TraceGraph?
-
-Agent benchmarks usually collapse a rich trajectory into a single scalar such as pass/fail or reward. TraceGraph keeps the **process geometry**: where agents go, which states they share, where they get trapped, and how successful runs recover.
-
-TraceGraph provides four complementary views:
-
-| View | Question | Output |
-|------|----------|--------|
-| **Shared landscape** | Which decision states are shared across models and tasks? | A mutual-kNN / BCC process atlas built without model identity |
-| **Outcome overlay** | Which regions lead toward success or failure? | Diffused reward fields, productive cores, trap regions, basins, and gates |
-| **Process profile** | What does each model supply, and what does each benchmark demand? | Access / Trap / Repair events with supply-demand decomposition |
-| **Runtime recovery** | Can graph-derived traps improve downstream agents? | SWE-bench prefix-fork interventions with detector-guided repair notes |
+**TraceGraph** pools multi-model agent rollouts on the same task and maps their observable action–observation steps onto one shared decision landscape. Model identity and outcomes do not affect the landscape topology; terminal outcomes are overlaid only afterwards, as historical high-outcome regions (productive cores) and low-outcome regions (traps). Three rollout events read off this landscape, Access, Trap exposure, and Repair, give model supply profiles and benchmark demand profiles. A focused SWE-bench study uses the historical trap regions as runtime triggers for lightweight recovery continuations.
 
 ## Method at a Glance
 
-1. **Encode steps** as sparse symbolic key sets over tool use, action intent, command class, file cues, observation patterns, temporal phase, and search cues.
-2. **Build shared graphs** with IDF-weighted Jaccard similarity, mutual-kNN edges, and biconnected-component decomposition.
-3. **Propagate outcomes** with personalized PageRank to identify high-value cores, low-value traps, failure basins, and recovery gates.
-4. **Measure behavior** through Access, Trap exposure, and Repair events, then aggregate model supply vectors and benchmark demand vectors.
-5. **Intervene on SWE-bench** by triggering a trap-aware recovery note when a live agent enters a graph-derived trap state.
-
-The released intervention runner includes a bundled MiniSWEAgent-style runtime under `tracegraph.sweagent`; no private agent framework is required. The paper experiments used plain chat-completion `THOUGHT` / `ACTION` prompting, not Harmony/native tool prompting.
+1. **Encode steps** as sparse, prefix-tagged key sets over tool name, action type, command class, observation pattern, file cues, and temporal phase, plus URL-domain, query-novelty, and evidence-count keys on the search split.
+2. **Build shared landscapes** per task from pooled rollouts: IDF-weighted Jaccard similarity, mutual-kNN edges, and biconnected-component (BCC) decomposition.
+3. **Overlay outcomes** after the landscape is fixed: seed each retained block with the outcomes of its visiting runs, diffuse the seeds over the block quotient graph, and take the top quartile of the positive field as cores and the bottom quartile of the negative field as traps.
+4. **Read rollout events** from compact block paths, Access (reaching a core), Trap exposure (visiting a trap), and Repair (a trap visit followed later by a core visit), and aggregate them into model supply and benchmark demand.
+5. **Recover on SWE-bench**: a detector matches live steps against the historical trap library and, when it fires, forks matched continuations (Baseline / Hot / Note) from the same snapshot.
 
 ---
 
@@ -63,41 +48,39 @@ The released intervention runner includes a bundled MiniSWEAgent-style runtime u
 
 ```
 tracegraph/                          # Core library
-  constants.py                       #   All hyperparameters (k, sigma, alpha, ...)
-  signature.py                       #   Key-set extraction + IDF-weighted Jaccard
+  constants.py                       #   Fixed hyperparameters
+  signature.py                       #   IDF-weighted Jaccard, kNN, runtime observation keys
   graph_construction.py              #   Mutual-kNN graph + BCC decomposition
-  reward_field.py                    #   Reward diffusion + core/trap masks
-  failure_basins.py                  #   Basin/gate/loop detection
-  typed_state_mdp.py                 #   Typed-state kernels + mechanism metrics
-  dataset.py                         #   Path helpers
+  reward_field.py                    #   Block seeds, field diffusion, core mask
+  typed_state_mdp.py                 #   Typed-state kernel for the signature-ablation statistic
+  dataset.py                         #   Parsed-outcome loader
   sweagent/                          #   Bundled MiniSWEAgent-style SWE runtime
 
 scripts/
+  data/                              # Source data
+    download_cxcmu.py                #   Download the cx-cmu trajectory release
+    parse_cxcmu.py                   #   Parse records into per-task step sequences
+
   pipeline/                          # Build shared landscapes
-    extract_signatures.py            #   Parse -> key-sets + IDF + kNN
+    extract_signatures.py            #   Parse -> key sets + IDF + kNN
     build_graphs.py                  #   kNN -> mutual-kNN + BCC analysis
-    compute_reward_field.py          #   Reward diffusion + core/trap overlay
-    detect_failure_basins.py         #   Basin + gate + loop motif detection
-    extract_typed_dynamics.py        #   Per-model metrics (committor, MFPT, ...)
+    compute_reward_field.py          #   Outcome diffusion + core mask
     rollout_events.py                #   Access / Trap / Repair events + supply/demand
 
-  analysis/                          # Process profile analysis
-    cross_benchmark.py               #   ANOVA, rank consistency, Spearman rho
-    annotation_sampling.py           #   BCC pair + articulation sampling for validation
-    signature_ablation.py            #   Leave-one-key-type-out ablation
-    enhanced_separability.py         #   Logistic regression + 4 capability axes
-    supply_demand_decomposition.py   #   Bilinear supply x demand factorization
-    counterfactual.py                #   MDP kernel interventions + matched controls
-    shared_vs_permodel.py            #   Shared vs per-model graph robustness
-    sensitivity.py                   #   Bootstrap CI + hyperparameter sweeps
+  analysis/                          # Validation and robustness
+    annotation_sampling.py           #   BCC-pair + articulation samples for annotation
+    signature_ablation.py            #   Seven signature conditions, model separation
+    shared_vs_permodel.py            #   Pooled vs per-model graph size
+    sensitivity.py                   #   Bootstrap CIs + core/trap quantile sweeps
 
-  intervention/                      # Trap-aware recovery (RQ4)
-    swe_runner.py                    #   SWE-bench prefix-fork intervention runner
-    eval_patches.py                  #   SWE-bench harness evaluation
-    pool_analysis.py                 #   Difference-in-differences analysis
-    detector_sweep.py                #   Trigger predicate replay sweep
+  intervention/                      # SWE-bench recovery
+    build_swe_trap_library.py        #   Trap / reference libraries + IDF corpus
+    build_swe_trap_diagnosis.py      #   Six-family diagnosis sidecar for the Note arm
+    swe_runner.py                    #   Prefix-fork runner (Baseline / Hot / Note)
+    eval_patches.py                  #   Official SWE-bench harness evaluation
 
-paper/                               # LaTeX source
+resources/swebench_detector/         # Bundled detector libraries
+paper/                               # arXiv LaTeX source and figures
 ```
 
 ---
@@ -117,13 +100,12 @@ pip install -r requirements.txt
 ### Additional dependencies for intervention experiments
 
 The intervention scripts (`scripts/intervention/`) additionally require:
-- Docker (for SWE-bench environment isolation)
-- A local LLM server (e.g., vLLM) or API access (DeepSeek, GLM)
-- The bundled `tracegraph.sweagent` runtime; no external agent framework is required
-- `datasets` for loading SWE-bench Verified metadata
-- `swebench` only when evaluating patches with the official harness
+- Docker and the SWE-bench Verified instance images
+- A local OpenAI-compatible LLM server (e.g., vLLM) or provider API access (DeepSeek, GLM)
+- `openai` and `datasets` (`pip install -e ".[intervention]"`)
+- `swebench` when evaluating patches with the official harness
 
-See `scripts/intervention/README.md` for setup details.
+The bundled `tracegraph.sweagent` runtime is the agent used in the experiments; no external agent framework is required. See `scripts/intervention/README.md` for details.
 
 ---
 
@@ -134,16 +116,16 @@ python scripts/data/download_cxcmu.py
 python scripts/data/parse_cxcmu.py
 ```
 
-The parser writes `data/cxcmu/parsed/{benchmark}/{task_id}.jsonl`, the input expected by the pipeline. Set `HF_TOKEN` if HuggingFace requires gated access to the trajectory release.
+The release is gated on Hugging Face; set `HF_TOKEN` after requesting access. The parser writes `data/cxcmu/parsed/{benchmark}/{task_id}.jsonl`, the input expected by the pipeline. Raw trajectories are not redistributed with this code.
 
 ---
 
 ## Usage
 
-### Pipeline: Building Shared Landscapes
-
 All scripts are run from the repository root. They read from `data/` and write
 to `results/`.
+
+### Pipeline: Building Shared Landscapes
 
 ```bash
 # 1. Extract symbolic signatures + IDF + kNN arrays
@@ -152,64 +134,54 @@ python scripts/pipeline/extract_signatures.py --benchmark swebench
 # 2. Build mutual-kNN graphs + BCC decomposition
 python scripts/pipeline/build_graphs.py --benchmark swebench
 
-# 3. Compute reward field (diffusion + core/trap masks)
+# 3. Overlay outcomes (diffused field + core mask)
 python scripts/pipeline/compute_reward_field.py --benchmark swebench
 
-# 4. Detect failure basins, recovery gates, loop motifs
-python scripts/pipeline/detect_failure_basins.py --benchmark swebench
-
-# 5. Extract per-model typed-state dynamics
-python scripts/pipeline/extract_typed_dynamics.py --benchmark swebench
-
-# 6. Compute rollout events + supply/demand profiles
-python scripts/pipeline/rollout_events.py --benchmark swebench
+# 4. Compute rollout events + supply/demand profiles
+python scripts/pipeline/rollout_events.py
 ```
 
-### Analysis: Process Profiles
+Omit `--benchmark` to process all five splits; `bash scripts/run_pipeline.sh` runs the same stages followed by the sensitivity analysis.
+
+### Analysis
 
 ```bash
-# Cross-benchmark analysis (ANOVA, Kendall tau, Spearman rho)
-python scripts/analysis/cross_benchmark.py
+# Blinded samples for the BCC-pair and articulation annotation checks
+python scripts/analysis/annotation_sampling.py
 
-# Capability axes (4 task-centered composite dimensions)
-python scripts/analysis/enhanced_separability.py
+# Signature ablation (30 tasks per split = 150 tasks)
+python scripts/analysis/signature_ablation.py
 
-# Supply x demand bilinear decomposition
-python scripts/analysis/supply_demand_decomposition.py
+# Pooled vs per-model graph size
+python scripts/analysis/shared_vs_permodel.py
 
-# Counterfactual MDP stress tests
-python scripts/analysis/counterfactual.py
-
-# Bootstrap CI + hyperparameter sensitivity
+# Bootstrap CIs for supply and demand + core/trap quantile sweeps
 python scripts/analysis/sensitivity.py
 ```
 
-### Intervention: Trap-Aware Recovery
+### Intervention: SWE-bench Recovery
 
-The SWE detector ships with bundled libraries in `resources/swebench_detector/`. To rebuild them from local graph artifacts, run:
+The detector libraries ship in `resources/swebench_detector/`. To rebuild them from local graph artifacts:
 
 ```bash
 python scripts/intervention/build_swe_trap_library.py
 python scripts/intervention/build_swe_trap_diagnosis.py
 ```
 
+Run the prefix-fork study; all detector and decoding defaults match the paper:
+
 ```bash
-# SWE-bench prefix-fork recovery (requires docker + LLM server)
 python scripts/intervention/swe_runner.py \
-    --design prefix-fork \
-    --arms tg_baseline tg_hot tg_repair_cool \
-    --instances django__django-11066 \
-    --seed 11
+    --api-provider vllm \
+    --model-base-url http://localhost:8000/v1 \
+    --model-name <served-model-name> \
+    --output results/cxcmu/intervention/swe_prefix_fork.jsonl
 
-# Evaluate patches via official SWE-bench harness
 python scripts/intervention/eval_patches.py \
-    --pilot-glob "results/cxcmu/intervention/*.jsonl"
-
-# Difference-in-differences analysis
-python scripts/intervention/pool_analysis.py
+    --rollout-glob "results/cxcmu/intervention/swe_prefix_fork.jsonl"
 ```
 
-### Reproducing the paper's numbers
+### Reproduction notes
 
 Three details decide whether a rerun matches the published tables.
 
@@ -218,17 +190,14 @@ multi-criteria score, so the reward-weighted analogue is used consistently
 for it: the block seed averages the per-task max-normalised reward of the
 visiting runs, and the demand contrast is reward-weighted. Splits listed in
 `CONTINUOUS_REWARD_BENCHMARKS` take this path automatically in
-`compute_reward_field.py`. Seeding MCPBench with the binary resolved
-fraction instead yields `+0.128 / -0.164 / +0.006` rather than the published
-`+0.216 / -0.166 / +0.020`.
+`compute_reward_field.py`.
 
 **The recovery detector fires on similarity plus local gates.** A trigger
 requires the trap-similarity threshold together with the warmup, cooldown,
-edit/submit intent, and file-locality gates in
-`resources/swebench_detector/`. The trap-versus-reference margin is recorded
-per step for bookkeeping and does not gate firing. Note also that
-exception-shaped observation keys match on source text the agent has read,
-not only on runtime tracebacks.
+edit/submit intent, and file-cue gates. The trap-versus-reference margin is
+recorded per step for bookkeeping and does not gate firing. Exception-shaped
+observation keys match on any observation text, including source code the
+agent has read, not only runtime tracebacks.
 
 **Neighbour ties are not bit-reproducible across NumPy versions.** Signature
 key sets rebuild byte-identically, but `argpartition` orders equidistant
@@ -239,18 +208,32 @@ unchanged; the residual noise on demand cells is about `±0.015`.
 
 ## Key Hyperparameters
 
-All hyperparameters are centralized in `tracegraph/constants.py`:
+Graph and overlay hyperparameters are fixed across splits in `tracegraph/constants.py`:
 
 | Parameter | Value | Purpose |
 |-----------|-------|---------|
-| `NEIGHBOR_K` | 6 | Mutual-kNN neighborhood size |
-| `DIST_SCALE` (sigma) | 0.35 | RBF bandwidth for edge weights |
-| `PROPAGATION_ALPHA` | 0.65 | Teleport weight in reward diffusion |
+| `NEIGHBOR_K` | 6 | Mutual-kNN neighbourhood size |
+| `PROPAGATION_ALPHA` | 0.65 | Seed weight α in the diffusion update f ← α·s + (1−α)·P·f |
 | `PROPAGATION_STEPS` | 24 | Number of diffusion iterations |
-| `CORE_POS_Q` | 0.75 | Positive quantile for core mask |
-| `FAILURE_BASIN_MIN_FAIL_RATE` | 0.70 | Minimum fail rate for basin seeds |
-| `FAILURE_BASIN_MAX_ESCAPE_3STEP` | 0.30 | Maximum 3-step escape probability |
-| `MAX_NODES` | 3000 | Node cap per task |
+| `SUPPORT_SHRINK_EXP` | 0.5 | Support-shrinkage exponent of the block seed |
+| `MIN_RUN_SUPPORT` | 3 | Minimum visiting runs for a block to receive a seed |
+| `CORE_POS_Q` | 0.75 | Core mask: quantile of the positive field |
+| `TRAP_QUANTILE` | 0.25 | Trap mask: quantile of the negative field (`rollout_events.py`) |
+| `MAX_NODES` | 3000 | Node cap per task graph |
+
+Detector and continuation defaults of `scripts/intervention/swe_runner.py`:
+
+| Setting | Value |
+|---------|-------|
+| Trap similarity threshold | 0.35 |
+| Trap–reference margin (bookkeeping only) | 0.03 |
+| Warmup / cooldown steps | 2 / 4 |
+| Max triggers per rollout | 1 |
+| Allowed intents | edit, submit |
+| Observation-key gate | none |
+| File-locality gate | require a `FILE_PATH:*` cue |
+| Step budget | 30 total steps per arm |
+| Temperature | 0.6 (Hot arm: 0.9), top-p 0.95 |
 
 ---
 

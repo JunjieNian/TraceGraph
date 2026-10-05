@@ -1,14 +1,10 @@
 numpy>=1.24
-networkx>=3.1
-tqdm>=4.65
-pandas>=2.0
-scikit-learn>=1.3
 scipy>=1.11
-statsmodels>=0.14
+tqdm>=4.65
 huggingface_hub>=0.16
 
 # Intervention scripts additionally require:
 # openai
 # datasets
-# swebench
+# swebench (only for scripts/intervention/eval_patches.py)
 # docker (system package)

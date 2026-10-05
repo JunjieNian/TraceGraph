@@ -1,25 +1,17 @@
 #!/usr/bin/env python3
-"""Per-rollout four-event process profiles for cx-cmu agent trajectories.
+"""Per-rollout process events and supply/demand profiles for cx-cmu trajectories.
 
 Reads enriched graph payloads (data/cxcmu/graphs/<bench>/<task>.pkl) and the
 parsed per-rollout rows (data/cxcmu/parsed/<bench>/<task>.jsonl), and emits
-per-rollout records with the four process events used in the analysis-paper
-main text:
+per-rollout records with the three process events:
 
     A_r  = 1[exists step with primary_block in C_t]           (Access)
-    E_r  = 1[exists step with primary_block in B_t]           (Trap exposure)
-    R_r  = 1[exists s<u with seq[s] in B_t and seq[u] in C_t] (Repair after trap)
-    G_r  = mean_{g in V_r ∩ G_t} q_t(g)                       (Gate resolution)
+    E_r  = 1[exists step with primary_block in T_t]           (Trap exposure)
+    R_r  = 1[exists s<u with seq[s] in T_t and seq[u] in C_t] (Repair)
 
-with B_t the bottom-quartile mask of the diffused outcome-normalized reward
-field (note: NOT the dual-threshold failure_basins; trap and repair are thus
-not circular), C_t the existing top-quartile core mask, G_t the set of blocks
-flagged has_articulation=True, and the empirical gate-outcome map
-
-    q_t(g) = (sum_{r: g in V_r} y_r + 0.5) / (|{r: g in V_r}| + 1.0)
-
-with Laplace smoothing. Rollouts without any visited gate are excluded from
-the G_r denominator (G_r = null in the JSONL row).
+with C_t the top-quartile core mask of the diffused outcome field and T_t
+the bottom-quartile mask of its negative values.  Paths are compact: each
+step maps to its primary retained block and consecutive repeats collapse.
 
 Outcomes y_r are read from parsed metadata:
     metadata.resolved_score in {0, 1}        for binary benchmarks
@@ -27,16 +19,16 @@ Outcomes y_r are read from parsed metadata:
 
 Outputs:
     results/cxcmu/rollout_events.jsonl
-        one row per rollout: {benchmark, task_id, model_id, run_id, y_r,
-                              A_r, E_r, R_r, G_r, visited_gate}
+        one row per rollout: {benchmark, task_id, model_id, run_id, run_str,
+                              y_r, A_r, E_r, R_r}
     results/cxcmu/rollout_events_supply_demand.json
-        per-model supply S_{m,a} and per-benchmark demand D_{b,a},
+        per-model supply S_{m,z} and per-benchmark demand D_{q,z},
         plus the model and benchmark lists used.
 
 The script does not modify any payloads on disk.
 
 Usage:
-    python scripts/100_rollout_events.py [--max-tasks N] [--benchmark BENCH]
+    python scripts/pipeline/rollout_events.py [--max-tasks N] [--benchmark BENCH]
 """
 from __future__ import annotations
 
@@ -50,9 +42,9 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from tqdm import tqdm
 
+from tracegraph.dataset import load_parsed_outcomes
 from tracegraph.reward_field import (
     build_run_resolved,
-    nontrivial_block_info,
     reconstruct_run_sequences,
 )
 
@@ -80,56 +72,6 @@ TRAP_QUANTILE = 0.25  # bottom quartile of the negative field
 
 # ── Helpers ─────────────────────────────────────────────────────────
 
-def load_parsed_outcomes(jsonl_path: Path) -> Dict[str, Dict[str, Any]]:
-    """Return {run_str: {model_id, resolved_score, raw_reward}} per row.
-
-    run_str follows the {model_id}__pass{pass_tag} convention used in
-    unique_runs/run_id_map of the graph payloads.
-    """
-    out: Dict[str, Dict[str, Any]] = {}
-    if not jsonl_path.exists():
-        return out
-    with open(jsonl_path, "r") as fh:
-        for line in fh:
-            line = line.strip()
-            if not line:
-                continue
-            row = json.loads(line)
-            model_id = row.get("model_id")
-            scaffold = row.get("scaffold_id")
-            run_id_str = row.get("run_id")  # parsed row's own run_id (string)
-            md = row.get("metadata", {}) or {}
-            pass_tag = md.get("pass")
-            if pass_tag is None and run_id_str is not None:
-                # Fallback: try to derive from run_id_str if needed.
-                pass_tag = run_id_str
-            if run_id_str is not None:
-                key = run_id_str
-            elif pass_tag is not None:
-                pass_tag_str = str(pass_tag)
-                if pass_tag_str.startswith("pass"):
-                    key = f"{model_id}__{pass_tag_str}"
-                else:
-                    key = f"{model_id}__pass{pass_tag_str}"
-            else:
-                key = None
-            score = md.get("resolved_score")
-            if score is None:
-                # Last-resort fallback to binary resolved flag.
-                score = 1.0 if row.get("resolved") else 0.0
-            entry = {
-                "model_id": model_id,
-                "scaffold_id": scaffold,
-                "resolved_score": float(score),
-                "raw_reward": md.get("raw_reward"),
-                "task_max_reward": md.get("task_max_reward"),
-                "run_id_str": run_id_str,
-            }
-            if key is not None:
-                out[key] = entry
-    return out
-
-
 def compute_trap_mask(field: np.ndarray, quantile: float = TRAP_QUANTILE) -> np.ndarray:
     """Return boolean mask of blocks in the bottom quantile of the negative field.
 
@@ -147,15 +89,6 @@ def compute_trap_mask(field: np.ndarray, quantile: float = TRAP_QUANTILE) -> np.
         return field < 0
     threshold = float(np.quantile(negative, quantile))  # most negative side
     return np.logical_and(field < 0, field <= threshold)
-
-
-def gate_block_set(block_meta: Dict[int, dict]) -> set:
-    """Set of block ids with at least one articulation point."""
-    return {
-        int(bid)
-        for bid, meta in block_meta.items()
-        if bool(meta.get("has_articulation", False))
-    }
 
 
 def compact_block_sequence(steps: List[dict]) -> List[int]:
@@ -195,9 +128,6 @@ def process_task(
     core_blocks = {int(nodes[i]) for i, c in enumerate(core_arr) if c}
     trap_blocks = {int(nodes[i]) for i, c in enumerate(trap_arr) if c}
 
-    block_meta = nontrivial_block_info(payload)
-    gate_blocks = gate_block_set(block_meta)
-
     run_sequences = reconstruct_run_sequences(payload)
     if not run_sequences:
         return []
@@ -211,8 +141,7 @@ def process_task(
     if not rid_to_runstr and unique_runs:
         rid_to_runstr = {i: str(s) for i, s in enumerate(unique_runs)}
 
-    # First pass: per-rollout visit/sequence summary, and y_r.
-    rollouts: List[Dict[str, Any]] = []
+    out_rows: List[Dict[str, Any]] = []
     run_resolved_fallback = build_run_resolved(payload)
     for rid, steps in run_sequences.items():
         run_str = rid_to_runstr.get(int(rid))
@@ -243,59 +172,23 @@ def process_task(
                     R_r = 1
                     break
 
-        visited_gates = sorted(visit_set & gate_blocks)
-        rollouts.append({
-            "rid": int(rid),
-            "run_str": run_str,
+        out_rows.append({
+            "benchmark": benchmark,
+            "task_id": task_id,
             "model_id": model_id,
+            "run_id": int(rid),
+            "run_str": run_str,
             "y_r": float(y_r),
             "A_r": int(A_r),
             "E_r": int(E_r),
             "R_r": int(R_r),
-            "visited_gates": visited_gates,
-        })
-
-    # Second pass: empirical q_t(g) per visited gate, then G_r per rollout.
-    gate_num: Dict[int, float] = defaultdict(float)
-    gate_den: Dict[int, int] = defaultdict(int)
-    for r in rollouts:
-        for g in r["visited_gates"]:
-            gate_num[int(g)] += float(r["y_r"])
-            gate_den[int(g)] += 1
-
-    q_g: Dict[int, float] = {}
-    for g, n in gate_den.items():
-        q_g[int(g)] = (gate_num[int(g)] + 0.5) / (n + 1.0)
-
-    out_rows: List[Dict[str, Any]] = []
-    for r in rollouts:
-        visited = r["visited_gates"]
-        if visited:
-            vals = [q_g[int(g)] for g in visited if int(g) in q_g]
-            G_r: Optional[float] = float(np.mean(vals)) if vals else None
-            visited_gate = True
-        else:
-            G_r = None
-            visited_gate = False
-        out_rows.append({
-            "benchmark": benchmark,
-            "task_id": task_id,
-            "model_id": r["model_id"],
-            "run_id": r["rid"],
-            "run_str": r["run_str"],
-            "y_r": r["y_r"],
-            "A_r": r["A_r"],
-            "E_r": r["E_r"],
-            "R_r": r["R_r"],
-            "G_r": G_r,
-            "visited_gate": bool(visited_gate),
         })
     return out_rows
 
 
 # ── Aggregation: supply (model) and demand (benchmark) ─────────────
 
-EVENTS = ["A_r", "E_r", "R_r", "G_r"]
+EVENTS = ["A_r", "E_r", "R_r"]
 
 
 def compute_supply_demand(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -437,7 +330,6 @@ def main(max_tasks: Optional[int] = None, benchmark: Optional[str] = None) -> No
     # Aggregate and write supply/demand.
     sd = compute_supply_demand(all_rows)
     sd["n_rollouts"] = len(all_rows)
-    sd["n_with_gate"] = sum(1 for r in all_rows if r.get("visited_gate"))
     sd["benchmarks"] = sorted({r["benchmark"] for r in all_rows})
     sd["models"] = sorted({r["model_id"] for r in all_rows})
     with open(SD_PATH, "w") as fh:
@@ -447,7 +339,6 @@ def main(max_tasks: Optional[int] = None, benchmark: Optional[str] = None) -> No
     print(f"Wrote {len(all_rows)} rollout rows → {EVENTS_PATH}")
     print(f"Wrote supply/demand for "
           f"{len(sd['models'])} models × {len(sd['benchmarks'])} benchmarks → {SD_PATH}")
-    print(f"Rollouts with a visited gate: {sd['n_with_gate']} / {sd['n_rollouts']}")
 
 
 if __name__ == "__main__":

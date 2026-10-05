@@ -9,7 +9,7 @@ Per task:
 5. Save enriched payload back to pickle
 
 Usage:
-    python scripts/84_reward_field_cxcmu.py [--max-tasks N] [--benchmark BENCH]
+    python scripts/pipeline/compute_reward_field.py [--max-tasks N] [--benchmark BENCH]
 """
 from __future__ import annotations
 
@@ -30,7 +30,6 @@ from tracegraph.constants import (
     PROPAGATION_STEPS,
     SUPPORT_SHRINK_EXP,
 )
-from tracegraph.graph_construction import nontrivial_blocks
 from tracegraph.dataset import load_parsed_outcomes
 from tracegraph.reward_field import (
     build_block_graph,
@@ -110,7 +109,7 @@ def main(max_tasks: int | None = None, benchmark: str | None = None):
             # Transition matrix
             P, node_to_idx = build_transition_matrix(nodes, block_adj)
 
-            # Seed vector (global).  Continuous-reward splits use the
+            # Seed vector.  Continuous-reward splits use the
             # reward-weighted analogue throughout, so the block seed averages
             # the per-task max-normalised reward of the visiting runs; a binary
             # seed here does not reproduce the published MCPBench demand row.
@@ -123,7 +122,6 @@ def main(max_tasks: int | None = None, benchmark: str | None = None):
             else:
                 run_outcomes = run_resolved
             seed = compute_seed_vector(
-                run_id=None,
                 nodes=nodes,
                 block_run_sets=block_run_sets,
                 run_outcomes=run_outcomes,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""RQ1 — Signature ablation: which key types drive model separability?
+"""Signature ablation: which key types drive model separation?
 
 7 ablation conditions:
   - full:        all keys (baseline)
@@ -11,13 +11,15 @@
   - random:      random key assignment (destroys semantics, preserves cardinality)
 
 For each condition, re-run: IDF → distances → kNN → graph → reward field →
-typed-state → committor. Compare ANOVA F-stat and silhouette score for
-model separability.
+typed-state kernel → per-model committor at decision-point states.  The
+model-separation statistic is the one-way ANOVA F across models; a task is
+valid when the rebuilt graph supports at least two models.  The default of
+30 tasks per benchmark gives the 150-task ablation.
 
 Output: results/cxcmu/signature_ablation/ablation_results.json
 
 Usage:
-    python scripts/90_signature_ablation.py [--max-tasks 30] [--benchmark BENCH] [--seed 42]
+    python scripts/analysis/signature_ablation.py [--max-tasks 30] [--benchmark BENCH] [--seed 42]
 """
 from __future__ import annotations
 
@@ -36,7 +38,6 @@ from tqdm import tqdm
 
 from tracegraph.constants import (
     CORE_POS_Q,
-    DIST_SCALE,
     EOS_FAILED,
     EOS_RESOLVED,
     LAPLACE_ALPHA,
@@ -154,7 +155,6 @@ def _run_pipeline_on_keys(
     edges = build_mutual_knn_edges(
         knn_indices, knn_dists,
         neighbor_k=NEIGHBOR_K,
-        dist_scale=DIST_SCALE,
     )
     if len(edges) < 3:
         return None
@@ -212,7 +212,7 @@ def _run_pipeline_on_keys(
 
     # Reward field + core mask
     seed = compute_seed_vector(
-        run_id=None, nodes=nodes, block_run_sets=block_run_sets,
+        nodes=nodes, block_run_sets=block_run_sets,
         run_resolved=run_resolved, min_run_support=max(1, MIN_RUN_SUPPORT),
         support_shrink_exp=SUPPORT_SHRINK_EXP,
     )
@@ -267,11 +267,8 @@ def _run_pipeline_on_keys(
                 if len(dp_vals) > 0:
                     m_committor_dp = float(np.mean(dp_vals))
 
-        # Also get resolve rate
-        n_resolved = sum(1 for r in rids if run_resolved.get(r, False))
         per_model[model_id] = {
             "committor_dp": m_committor_dp,
-            "resolve_rate": n_resolved / len(rids) if rids else 0.0,
             "n_runs": len(rids),
         }
 
@@ -282,7 +279,7 @@ def _run_pipeline_on_keys(
 
 
 def _compute_separability_metrics(per_model_results: list[dict]) -> dict:
-    """Compute ANOVA F-stat and silhouette-like metric from per-model committors."""
+    """Compute the one-way ANOVA F statistic of per-model committors."""
     # Collect committor values grouped by model
     model_groups = defaultdict(list)
     for task_result in per_model_results:
@@ -304,41 +301,9 @@ def _compute_separability_metrics(per_model_results: list[dict]) -> dict:
         except Exception:
             pass
 
-    # Silhouette-like: ratio of between-model variance to total variance
-    all_vals = [v for g in groups for v in g]
-    if len(all_vals) >= 4 and len(groups) >= 2:
-        total_var = float(np.var(all_vals))
-        group_means = [np.mean(g) for g in groups]
-        between_var = float(np.var(group_means))
-        silhouette_ratio = between_var / max(total_var, 1e-12)
-    else:
-        silhouette_ratio = None
-
-    # Spearman correlation between committor and resolve rate
-    committor_vals = []
-    resolve_vals = []
-    for task_result in per_model_results:
-        for model_id, metrics in task_result.items():
-            cdp = metrics.get("committor_dp")
-            rr = metrics.get("resolve_rate")
-            if cdp is not None and not math.isnan(cdp) and rr is not None:
-                committor_vals.append(cdp)
-                resolve_vals.append(rr)
-
-    rho = None
-    if len(committor_vals) >= 5:
-        try:
-            rho_val, _ = scipy_stats.spearmanr(committor_vals, resolve_vals)
-            if not math.isnan(rho_val):
-                rho = float(rho_val)
-        except Exception:
-            pass
-
     return {
         "f_stat": round(float(f_stat), 4) if f_stat is not None else None,
         "p_value": round(float(p_val), 6) if p_val is not None else None,
-        "silhouette_ratio": round(silhouette_ratio, 6) if silhouette_ratio is not None else None,
-        "reward_correlation_rho": round(rho, 4) if rho is not None else None,
         "n_tasks_valid": len(per_model_results),
         "n_models": len(groups),
     }
@@ -409,19 +374,15 @@ def main(max_tasks: int = 30, benchmark: str | None = None, seed: int = 42):
         results[condition] = metrics
 
         print(f"  Valid tasks: {metrics['n_tasks_valid']}, "
-              f"F={metrics['f_stat']}, "
-              f"silhouette={metrics['silhouette_ratio']}, "
-              f"ρ={metrics['reward_correlation_rho']}")
+              f"F={metrics['f_stat']}")
 
     # Summary comparison
     print("\n── Summary ──")
-    print(f"{'Condition':<15} {'F-stat':<10} {'Silhouette':<12} {'ρ(reward)':<10} {'N_valid':<8}")
-    print("-" * 55)
+    print(f"{'Condition':<15} {'F-stat':<10} {'N_valid':<8}")
+    print("-" * 33)
     for cond, m in results.items():
         f_str = f"{m['f_stat']:.2f}" if m['f_stat'] is not None else "N/A"
-        s_str = f"{m['silhouette_ratio']:.4f}" if m['silhouette_ratio'] is not None else "N/A"
-        r_str = f"{m['reward_correlation_rho']:.3f}" if m['reward_correlation_rho'] is not None else "N/A"
-        print(f"{cond:<15} {f_str:<10} {s_str:<12} {r_str:<10} {m['n_tasks_valid']:<8}")
+        print(f"{cond:<15} {f_str:<10} {m['n_tasks_valid']:<8}")
 
     # Ranking
     ranked = sorted(

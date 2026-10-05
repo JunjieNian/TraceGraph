@@ -1,46 +1,23 @@
-"""Key-set extraction and IDF-weighted Jaccard distance for agent traces.
+"""IDF-weighted Jaccard distance over symbolic key sets.
 
-Replaces activation-based key sets from SliceGraph with observable symbolic
-action-observation key sets extracted from SWE agent trajectories.
+The offline pipeline builds key sets in
+``scripts/pipeline/extract_signatures.py``; this module supplies the shared
+IDF weighting, distance, and kNN helpers, plus the observation-key
+extractor that the live SWE detector applies to raw tool output.
 
-Key types:
-    TOOL:{name}      — tool/function name from assistant tool_calls
-    CMD:{class}      — classified bash command (pytest, grep, sed, etc.)
-    OBS:{pattern}    — error/outcome patterns from observations
-    FILE_EXT:{ext}   — file extension of edited/viewed files
-    FILE_PATH:{path} — normalised file path
-    DIFF:{type}      — edit operation type (add_function, modify_function, etc.)
-    PHASE:{label}    — temporal phase (early, mid, late)
+Runtime observation keys:
+    OBS:{pattern}    — exception names and test/traceback/success patterns
 """
 from __future__ import annotations
 
 import math
 import re
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Set, Tuple
 
 import numpy as np
 
 
-# ── Bash command classification ──────────────────────────────────────
-
-_CMD_PATTERNS: List[Tuple[str, re.Pattern]] = [
-    ("pytest",  re.compile(r"\b(pytest|py\.test)\b")),
-    ("python",  re.compile(r"\b(python3?|ipython)\b")),
-    ("grep",    re.compile(r"\b(grep|rg|ag|ack)\b")),
-    ("find",    re.compile(r"\b(find|fd|locate)\b")),
-    ("sed",     re.compile(r"\b(sed)\b")),
-    ("cat",     re.compile(r"\b(cat|head|tail|less|more)\b")),
-    ("pip",     re.compile(r"\b(pip3?|conda)\s+install\b")),
-    ("git",     re.compile(r"\b(git)\b")),
-    ("cd",      re.compile(r"^\s*cd\b")),
-    ("ls",      re.compile(r"\b(ls|dir)\b")),
-    ("echo",    re.compile(r"\b(echo|printf)\b")),
-    ("mkdir",   re.compile(r"\b(mkdir)\b")),
-    ("rm",      re.compile(r"\b(rm|rmdir)\b")),
-    ("curl",    re.compile(r"\b(curl|wget)\b")),
-]
-
-# ── Observation error patterns ───────────────────────────────────────
+# ── Observation patterns ─────────────────────────────────────────────
 
 _OBS_ERROR_PATTERNS: List[Tuple[str, re.Pattern]] = [
     ("OBS:AssertionError",    re.compile(r"AssertionError|assert\s+.*failed", re.I)),
@@ -67,94 +44,9 @@ _OBS_OUTCOME_PATTERNS: List[Tuple[str, re.Pattern]] = [
     ("OBS:success",      re.compile(r"\bsuccess(?:ful(?:ly)?)?\b", re.I)),
 ]
 
-# ── Diff operation patterns ──────────────────────────────────────────
-
-_DIFF_PATTERNS: List[Tuple[str, re.Pattern]] = [
-    ("DIFF:add_import",     re.compile(r"^\+\s*(import |from .* import )", re.M)),
-    ("DIFF:add_function",   re.compile(r"^\+\s*def\s+\w+", re.M)),
-    ("DIFF:add_class",      re.compile(r"^\+\s*class\s+\w+", re.M)),
-    ("DIFF:add_condition",  re.compile(r"^\+\s*(if |elif |else:)", re.M)),
-    ("DIFF:add_try",        re.compile(r"^\+\s*(try:|except |finally:)", re.M)),
-    ("DIFF:modify_function", re.compile(r"^[-+]\s*def\s+\w+", re.M)),
-    ("DIFF:add_return",     re.compile(r"^\+\s*return\b", re.M)),
-    ("DIFF:add_assert",     re.compile(r"^\+\s*assert\b", re.M)),
-]
-
-# ── File path normalisation ─────────────────────────────────────────
-
-_PATH_RE = re.compile(
-    r"""(?:^|[\s"'(])(/[^\s"')]+\.\w+)""",
-    re.M,
-)
-
-
-def _classify_command(cmd: str) -> str:
-    """Classify a bash command into one of ~15 categories."""
-    for label, pat in _CMD_PATTERNS:
-        if pat.search(cmd):
-            return label
-    return "other"
-
-
-def _normalise_path(path: str) -> str:
-    """Normalise a file path by keeping only last 2 components."""
-    parts = path.strip().rstrip("/").split("/")
-    return "/".join(parts[-2:]) if len(parts) >= 2 else parts[-1]
-
-
-def _extract_extension(path: str) -> Optional[str]:
-    """Extract file extension from a path."""
-    if "." in path:
-        ext = path.rsplit(".", 1)[-1].lower()
-        if len(ext) <= 6 and ext.isalnum():
-            return ext
-    return None
-
-
-# ═══════════════════════════════════════════════════════════════════════
-# Public key-extraction functions
-# ═══════════════════════════════════════════════════════════════════════
-
-def extract_action_keys(message: dict) -> Set[str]:
-    """Extract ACTION/TOOL/CMD keys from an assistant message with tool_calls."""
-    keys: Set[str] = set()
-    tool_calls = message.get("tool_calls", [])
-    if not tool_calls and message.get("function_call"):
-        tool_calls = [{"function": message["function_call"]}]
-
-    for tc in tool_calls:
-        func = tc.get("function", {})
-        name = func.get("name", "")
-        if name:
-            keys.add(f"TOOL:{name}")
-
-        args = func.get("arguments", "")
-        if isinstance(args, str):
-            args_str = args
-        else:
-            args_str = str(args)
-
-        # Classify bash commands
-        if "bash" in name.lower() or "execute" in name.lower():
-            cmd = args_str
-            cmd_class = _classify_command(cmd)
-            keys.add(f"CMD:{cmd_class}")
-
-        # Detect action types from arguments
-        if "str_replace" in name.lower() or "edit" in name.lower():
-            keys.add("ACTION:edit")
-        elif "create" in name.lower() or "write" in name.lower():
-            keys.add("ACTION:create")
-        elif "view" in name.lower() or "read" in name.lower():
-            keys.add("ACTION:view")
-        elif "search" in name.lower() or "grep" in name.lower():
-            keys.add("ACTION:search")
-
-    return keys
-
 
 def extract_observation_keys(message: dict) -> Set[str]:
-    """Extract OBS keys from tool/user response messages."""
+    """Extract OBS keys from a tool/user response message."""
     keys: Set[str] = set()
     content = message.get("content", "")
     if isinstance(content, list):
@@ -172,93 +64,6 @@ def extract_observation_keys(message: dict) -> Set[str]:
     for label, pat in _OBS_OUTCOME_PATTERNS:
         if pat.search(content):
             keys.add(label)
-
-    return keys
-
-
-def extract_file_keys(message: dict) -> Set[str]:
-    """Extract FILE_EXT and FILE_PATH keys from file operations."""
-    keys: Set[str] = set()
-    tool_calls = message.get("tool_calls", [])
-    if not tool_calls and message.get("function_call"):
-        tool_calls = [{"function": message["function_call"]}]
-
-    for tc in tool_calls:
-        func = tc.get("function", {})
-        args = func.get("arguments", "")
-        if isinstance(args, dict):
-            args_str = str(args)
-        else:
-            args_str = str(args)
-
-        for match in _PATH_RE.finditer(args_str):
-            path = match.group(1)
-            ext = _extract_extension(path)
-            if ext:
-                keys.add(f"FILE_EXT:{ext}")
-            norm = _normalise_path(path)
-            if norm:
-                keys.add(f"FILE_PATH:{norm}")
-
-        # Also check common argument keys
-        if isinstance(args, dict):
-            for key in ("path", "file_path", "file", "filename"):
-                val = args.get(key, "")
-                if val and isinstance(val, str):
-                    ext = _extract_extension(val)
-                    if ext:
-                        keys.add(f"FILE_EXT:{ext}")
-                    norm = _normalise_path(val)
-                    if norm:
-                        keys.add(f"FILE_PATH:{norm}")
-
-    return keys
-
-
-def extract_diff_keys(message: dict) -> Set[str]:
-    """Extract DIFF keys from edit/patch operations."""
-    keys: Set[str] = set()
-    tool_calls = message.get("tool_calls", [])
-    if not tool_calls and message.get("function_call"):
-        tool_calls = [{"function": message["function_call"]}]
-
-    for tc in tool_calls:
-        func = tc.get("function", {})
-        args = func.get("arguments", "")
-        if isinstance(args, dict):
-            # str_replace_editor-style: look at new_str / old_str
-            new_str = args.get("new_str", "") or args.get("replacement", "")
-            old_str = args.get("old_str", "") or args.get("original", "")
-            diff_text = f"+{new_str}\n-{old_str}"
-        else:
-            diff_text = str(args)
-
-        for label, pat in _DIFF_PATTERNS:
-            if pat.search(diff_text):
-                keys.add(label)
-
-    return keys
-
-
-def extract_slice_keys(
-    action_msg: dict,
-    obs_msg: dict,
-    progress: float,
-) -> Set[str]:
-    """Combine all key extractors for one action-observation pair + PHASE."""
-    keys: Set[str] = set()
-    keys |= extract_action_keys(action_msg)
-    keys |= extract_observation_keys(obs_msg)
-    keys |= extract_file_keys(action_msg)
-    keys |= extract_diff_keys(action_msg)
-
-    # Add phase key
-    if progress < 1.0 / 3.0:
-        keys.add("PHASE:early")
-    elif progress < 2.0 / 3.0:
-        keys.add("PHASE:mid")
-    else:
-        keys.add("PHASE:late")
 
     return keys
 

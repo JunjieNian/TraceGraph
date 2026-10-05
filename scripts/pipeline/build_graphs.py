@@ -5,14 +5,15 @@ Per task (all models pooled):
 1. Load kNN arrays and metadata
 2. build_mutual_knn_edges()
 3. build_adjacency_list()
-4. compute_bcc_analysis() with resolved labels
+4. compute_bcc_analysis(); resolved labels only annotate block statistics
+   and never change the mutual-kNN topology or the BCC decomposition
 5. Save graph payload with slice_model_ids annotation
 
-Key addition: payload["slice_model_ids"] maps each slice to its model,
-enabling per-model analysis in downstream scripts.
+payload["slice_model_ids"] maps each step to its model, so model identity
+enters only after the landscape is fixed.
 
 Usage:
-    python scripts/83_build_cxcmu_graphs.py [--max-tasks N] [--benchmark BENCH]
+    python scripts/pipeline/build_graphs.py [--max-tasks N] [--benchmark BENCH]
 """
 from __future__ import annotations
 
@@ -25,7 +26,7 @@ from pathlib import Path
 import numpy as np
 from tqdm import tqdm
 
-from tracegraph.constants import DIST_SCALE, NEIGHBOR_K
+from tracegraph.constants import NEIGHBOR_K
 from tracegraph.graph_construction import (
     build_adjacency_list,
     build_mutual_knn_edges,
@@ -93,7 +94,7 @@ def build_task_graph(task_id: str, sig_dir: Path, parsed_path: Path) -> dict | N
 
     # Build graph
     k = min(NEIGHBOR_K, knn_indices.shape[1])
-    edges = build_mutual_knn_edges(knn_indices, knn_dists, k, DIST_SCALE)
+    edges = build_mutual_knn_edges(knn_indices, knn_dists, k)
     adj = build_adjacency_list(edges, n_slices)
 
     # BCC analysis

@@ -1,16 +1,15 @@
 """TraceGraph — shared decision-landscape analysis of agent trajectories.
 
-Core modules for building graph-theoretic process atlases from
+Core modules for building shared decision landscapes from pooled,
 observable agent traces (cx-cmu/agent_trajectories dataset).
 
 Modules:
-    signature           — key-set extraction, IDF weighting, Jaccard distance
-    graph_construction  — mutual-kNN graph, BCC decomposition, role assignment
-    reward_field        — label-seeded propagation + high-value core mask
-    typed_state_mdp     — typed-state encoding, Laplace kernels, TV
-    failure_basins      — failure basin detection + recovery gates
+    signature           — runtime observation keys, IDF weighting, Jaccard distance
+    graph_construction  — mutual-kNN graph and BCC decomposition
+    reward_field        — outcome-seeded diffusion over the block quotient graph
+    typed_state_mdp     — typed-state kernel behind the signature-ablation statistic
     constants           — all canonical hyperparameters
-    dataset             — multi-dataset path helpers + registry
+    dataset             — parsed-outcome loader
     sweagent            — bundled MiniSWEAgent-style SWE runtime
 """
 

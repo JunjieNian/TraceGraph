@@ -10,7 +10,7 @@ Per task (all rollouts pooled):
 6. Save: key_sets.pkl, idf_weights.json, slice_metadata.json, knn_*.npy
 
 Usage:
-    python scripts/82_extract_cxcmu_signatures.py [--max-tasks N] [--benchmark BENCH]
+    python scripts/pipeline/extract_signatures.py [--max-tasks N] [--benchmark BENCH]
 """
 from __future__ import annotations
 
@@ -18,7 +18,6 @@ import argparse
 import json
 import pickle
 import re
-from collections import defaultdict
 from pathlib import Path
 
 import numpy as np

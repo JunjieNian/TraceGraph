@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "tracegraph"
@@ -11,12 +11,8 @@ license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.24",
-    "networkx>=3.1",
-    "tqdm>=4.65",
-    "pandas>=2.0",
-    "scikit-learn>=1.3",
     "scipy>=1.11",
-    "statsmodels>=0.14",
+    "tqdm>=4.65",
     "huggingface_hub>=0.16",
 ]
 

@@ -1,12 +1,15 @@
-"""TraceGraph construction: Mutual-kNN graph + BCC decomposition & role assignment.
+"""TraceGraph construction: mutual-kNN graph + BCC decomposition.
 
-Adapted from SliceGraph §3.1–3.2 for SWE agent trajectory analysis.
 Transforms pre-computed kNN arrays (from IDF-weighted Jaccard distances on
 symbolic action-observation key sets) into block-level analysis objects.
 
 Pipeline:
     kNN arrays → mutual-kNN edges → undirected graph → BCC decomposition
-    → block statistics → role assignment (5 roles) → block-cut tree
+    → block statistics → block-cut tree
+
+The coarse block roles assigned here are consumed only by the typed-state
+kernel behind the signature-ablation statistic; the main analysis uses the
+core and trap overlays of ``reward_field`` instead.
 """
 from __future__ import annotations
 
@@ -25,26 +28,19 @@ def build_mutual_knn_edges(
     knn_indices: np.ndarray,
     knn_dists: np.ndarray,
     neighbor_k: int = 6,
-    dist_scale: float = 0.35,
-    slice_run: Optional[np.ndarray] = None,
-    exclude_same_run: bool = False,
 ) -> List[Dict[str, Any]]:
     """Build mutual-kNN edge list from pre-computed kNN arrays.
 
     An edge (i, j) exists iff i is in j's top-k AND j is in i's top-k.
-    Edge weight = exp(-dist / dist_scale).
+    The graph is unweighted; each edge records its Jaccard distance.
 
     Args:
         knn_indices: (n_slices, K) array of neighbor indices.
         knn_dists:   (n_slices, K) array of Jaccard distances.
         neighbor_k:  number of neighbors to consider.
-        dist_scale:  RBF scale for edge weight.
-        slice_run:   optional array mapping node index → run_id.
-        exclude_same_run: if True and slice_run is given, drop edges
-                          where both endpoints belong to the same run.
 
     Returns:
-        List of edge dicts with {source, target, weight, distance}.
+        List of edge dicts with {source, target, distance}.
     """
     n_slices = knn_indices.shape[0]
     k = min(neighbor_k, knn_indices.shape[1])
@@ -68,16 +64,10 @@ def build_mutual_knn_edges(
                 edge_key = (min(i, j), max(i, j))
                 if edge_key not in seen:
                     seen.add(edge_key)
-                    # Optionally exclude same-run edges
-                    if exclude_same_run and slice_run is not None:
-                        if slice_run[edge_key[0]] == slice_run[edge_key[1]]:
-                            continue
                     d = min(dist_map.get((i, j), 1.0), dist_map.get((j, i), 1.0))
-                    w = np.exp(-d / max(dist_scale, 1e-6))
                     edges.append({
                         "source": edge_key[0],
                         "target": edge_key[1],
-                        "weight": round(float(w), 6),
                         "distance": round(d, 6),
                     })
     return edges
@@ -265,16 +255,16 @@ def build_block_cut_tree(
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Block role assignment (5 roles, agent-adapted)
+# Block role assignment (5 roles)
 # ═══════════════════════════════════════════════════════════════════════
 
 @dataclass(frozen=True)
 class RoleThresholdConfig:
-    """Thresholds for the 5-role classification (agent-adapted).
+    """Thresholds for the 5-role classification.
 
     Roles:
-        common_setup    — high coverage, early position, large (≈ shared_trunk)
-        success_outcome — late, high resolved purity, many runs (≈ answer_basin)
+        common_setup    — high coverage, early position, large
+        success_outcome — late, high resolved purity, many runs
         weak_basin      — late, large, but low purity
         decision_point  — small, at articulation point
         intermediate    — everything else

@@ -1,27 +1,26 @@
 #!/usr/bin/env python3
-"""Build a cleaned SWE-bench intervention library (trap / core / nontrap + IDF).
+"""Build the SWE-bench detector libraries (trap / reference + IDF).
 
 The script scans cx-cmu SWE-bench graph artifacts and emits the detector
-libraries consumed by `scripts/intervention/swe_runner.py`
-to detect trap-like (low-outcome) steps and core-like (productive) steps
-during a live multi-step SWE agent run on the swebench docker images.
+libraries consumed by `scripts/intervention/swe_runner.py` during a live
+multi-step SWE agent run on the SWE-bench Docker images.
 
 Per task graph:
-  1. Trap blocks = bottom-quartile of the diffused negative reward field
-     (same rule as scripts/100_rollout_events.py).
+  1. Trap blocks = bottom quartile of the diffused negative reward field
+     (same rule as scripts/pipeline/rollout_events.py).
   2. Core blocks = existing top-quartile core mask in the graph payload.
   3. Walk node_bcc_map to harvest step-level key sets.
   4. Strip generic detection keys (PHASE:*, ACTION:other).
-  5. Aggregate by sorted detection-key tuple; deduplicate ambiguous trap/core.
+  5. Aggregate by sorted detection-key tuple; drop signatures that occur in
+     both trap and core blocks.
 
-For SWE the relevant signal-bearing keys include:
-  TOOL:execute_bash, ACTION:edit / view / create, CMD:pytest / grep / cat / sed / python / git
-  OBS:error, OBS:traceback, OBS:test_failed, OBS:test_passed, etc.
+The trap library drives the trigger.  The core-side library is the
+reference set behind the per-step trap–reference margin, which is recorded
+for bookkeeping only and never gates a trigger.
 
 Outputs:
   data/cxcmu/intervention/swebench_trap_library.json
   data/cxcmu/intervention/swebench_core_library.json
-  data/cxcmu/intervention/swebench_nontrap_library.json
   data/cxcmu/intervention/swebench_idf_corpus.json
 """
 from __future__ import annotations
@@ -29,7 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 import pickle
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
@@ -136,7 +135,6 @@ def main(graph_dir: Path = GRAPH_DIR, sig_dir: Path = SIG_DIR, out_dir: Path = O
     out_dir.mkdir(parents=True, exist_ok=True)
     trap_raw: List[Dict[str, Any]] = []
     core_raw: List[Dict[str, Any]] = []
-    nontrap_raw: List[Dict[str, Any]] = []
     step_sets: List[Set[str]] = []
     task_ids_seen: Set[str] = set()
     n_steps_total = 0
@@ -183,19 +181,13 @@ def main(graph_dir: Path = GRAPH_DIR, sig_dir: Path = SIG_DIR, out_dir: Path = O
                 trap_raw.append(example)
             elif bids_int & core_blocks:
                 core_raw.append(example)
-                nontrap_raw.append(example)
-            else:
-                nontrap_raw.append(example)
 
     trap_examples, trap_sigs = aggregate_examples(trap_raw)
     core_examples, core_sigs = aggregate_examples(core_raw)
-    nontrap_examples, nontrap_sigs = aggregate_examples(nontrap_raw)
 
     ambiguous = trap_sigs & core_sigs
     trap_clean = [ex for ex in trap_examples if tuple(ex["detection_keys"]) not in ambiguous]
     core_clean = [ex for ex in core_examples if tuple(ex["detection_keys"]) not in ambiguous]
-    forbidden = trap_sigs | core_sigs
-    nontrap_clean = [ex for ex in nontrap_examples if tuple(ex["detection_keys"]) not in forbidden]
 
     idf = build_idf_weights(step_sets)
 
@@ -205,9 +197,6 @@ def main(graph_dir: Path = GRAPH_DIR, sig_dir: Path = SIG_DIR, out_dir: Path = O
     write_library(out_dir / "swebench_core_library.json",
                   kind="core", examples=core_clean,
                   n_tasks=len(task_ids_seen), n_steps=n_steps_total)
-    write_library(out_dir / "swebench_nontrap_library.json",
-                  kind="nontrap", examples=nontrap_clean,
-                  n_tasks=len(task_ids_seen), n_steps=n_steps_total)
     with open(out_dir / "swebench_idf_corpus.json", "w") as fh:
         json.dump(idf, fh, indent=2)
 
@@ -216,7 +205,6 @@ def main(graph_dir: Path = GRAPH_DIR, sig_dir: Path = SIG_DIR, out_dir: Path = O
     print(f"Steps total:          {n_steps_total}")
     print(f"Trap signatures:      {len(trap_clean)}")
     print(f"Core signatures:      {len(core_clean)}")
-    print(f"Non-trap signatures:  {len(nontrap_clean)}")
     print(f"Ambiguous removed:    {len(ambiguous)}")
     print(f"IDF keys:             {len(idf)}")
     cnt = Counter()

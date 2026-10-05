@@ -1,7 +1,8 @@
 """MiniSWEAgent-style runtime bundled for TraceGraph SWE interventions.
 
-The paper experiments used the plain chat-completion ACTION format implemented
-here. Harmony/native tool prompting is not part of the reported experiments.
+The paper experiments used the plain chat-completion THOUGHT / ACTION format
+implemented here: one bash command per turn, executed inside the SWE-bench
+Docker image of the instance.
 """
 
 from __future__ import annotations
@@ -291,16 +292,12 @@ class ModelResponse:
 
     content: str
     logprobs: list[TokenLogprob] | None = None
-    prompt_logprobs: list[TokenLogprob] | None = None
     request_id: str | None = None
     usage: dict[str, int] = field(default_factory=dict)
     inference_time: float = 0.0
     finish_reason: str | None = None
     reasoning: str = ""
     raw_logprobs: Any = None
-    raw_prompt_logprobs: Any = None
-    prompt_token_ids: list[int] | None = None
-    routed_experts: list | None = None
     raw_completion_text: str = ""
 
 
@@ -319,9 +316,6 @@ class VLLMModel:
         request_timeout: float = 420.0,
         max_retries: int = 6,
         per_endpoint_max_concurrency: int | None = 8,
-        record_prompt_tokens: bool = False,
-        prompt_logprobs: int | None = None,
-        return_token_ids: bool | None = None,
         reasoning_effort: str | None = None,
     ):
         urls = [item.strip() for item in str(base_url).split(",") if item.strip()]
@@ -349,9 +343,6 @@ class VLLMModel:
         self.max_tokens = max_tokens
         self.request_timeout = request_timeout
         self.max_retries = max_retries
-        self.record_prompt_tokens = record_prompt_tokens
-        self.prompt_logprobs = prompt_logprobs
-        self.return_token_ids = record_prompt_tokens if return_token_ids is None else return_token_ids
         self.reasoning_effort = reasoning_effort
 
     def query(
@@ -382,8 +373,6 @@ class VLLMModel:
             extra_body["reasoning_effort"] = self.reasoning_effort
         if self.top_k is not None:
             extra_body["top_k"] = self.top_k
-        if self.return_token_ids:
-            extra_body["return_token_ids"] = True
         if extra_body:
             kwargs["extra_body"] = extra_body
         if max_tok is not None:
@@ -461,7 +450,6 @@ class VLLMModel:
             finish_reason=getattr(choice, "finish_reason", None),
             reasoning=reasoning,
             raw_logprobs=raw_logprobs,
-            routed_experts=getattr(choice, "routed_experts", None),
         )
 
     @staticmethod

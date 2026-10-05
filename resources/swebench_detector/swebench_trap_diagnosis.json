@@ -1,6 +1,6 @@
 {
   "schema": "swebench_trap_diagnosis.v1",
-  "source_trap_library": "data/cxcmu/intervention/swebench_trap_library.json",
+  "source_trap_library": "resources/swebench_detector/swebench_trap_library.json",
   "n_traps": 35,
   "families": {
     "blind_edit_error": {

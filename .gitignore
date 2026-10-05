@@ -1,8 +1,8 @@
 # Data and results (generated)
-data/
-results/
-logs/
-figs/
+/data/
+/results/
+/logs/
+/figs/
 
 # Python
 __pycache__/

@@ -1,14 +1,14 @@
-"""Reward-field propagation and core-mask extraction.
+"""Outcome overlays: block seeds, field diffusion, and the core mask.
 
-Adapted from SliceGraph §3.4 for SWE agent trajectory analysis.
-Correctness labels (resolved/failed) are mapped to block-level seeds,
-then diffused over the block graph via a personalised PageRank-style
-iteration.  The high-value core is the set of positive-field blocks
-above a quantile threshold.
+Terminal outcomes are added only after the BCC landscape is fixed.  Each
+retained block receives a seed from the outcomes of its visiting runs, the
+seed is diffused over the block quotient graph, and the productive core is
+the set of positive-field blocks above a quantile threshold.  The trap mask
+(bottom quantile of the negative field) is derived in
+``scripts/pipeline/rollout_events.py``.
 """
 from __future__ import annotations
 
-import math
 from collections import defaultdict
 from itertools import combinations
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
@@ -56,9 +56,6 @@ def reconstruct_run_sequences(
 
     Each step is a dict with keys: pos, local_idx, progress, block_ids,
     primary_block.
-
-    Adapted for TraceGraph payload format: uses 'trace_info' instead of
-    SliceGraph's 'slice_info' from the problem dict.
     """
     rtc = payload.get("role_threshold_cache", {})
     selected = list(rtc.get("selected_slices", []))
@@ -267,7 +264,6 @@ def support_shrinkage(n_visit: int, n_total_runs: int, exponent: float) -> float
 
 def compute_seed_vector(
     *,
-    run_id: Optional[int],
     nodes: Sequence[int],
     block_run_sets: Dict[int, Set[int]],
     run_resolved: Optional[Dict[int, Any]] = None,
@@ -275,7 +271,7 @@ def compute_seed_vector(
     support_shrink_exp: float,
     run_outcomes: Optional[Dict[int, Any]] = None,
 ) -> np.ndarray:
-    """Compute global or leave-one-out (LOO) block reward seeds.
+    """Compute the block reward seeds of one task.
 
     Each block seed is the excess outcome of its visiting runs over the
     task base rate, shrunk by visit support.  Outcomes may be binary or
@@ -285,10 +281,6 @@ def compute_seed_vector(
     uses the reward-weighted analogue throughout.  Booleans are read as
     ``1.0``/``0.0``, so the binary case is the special case of this
     formula and both paths share one implementation.
-
-    When ``run_id`` is None, the global seed is computed.  Otherwise the
-    outcome of ``run_id`` is excluded (LOO), so the reward field used to
-    score a run never includes that run's own outcome.
     """
     outcomes = run_outcomes if run_outcomes is not None else run_resolved
     if outcomes is None:
@@ -300,14 +292,7 @@ def compute_seed_vector(
         return np.zeros(len(nodes), dtype=float)
 
     values = [float(outcomes[rid]) for rid in all_runs]
-    loo = run_id is not None and run_id in outcomes
-    if loo:
-        y_excluded = float(outcomes[run_id])
-        denom_runs = max(1, n_runs - 1)
-        p_base = (float(np.sum(values)) - y_excluded) / denom_runs
-    else:
-        y_excluded = 0.0
-        p_base = float(np.mean(values))
+    p_base = float(np.mean(values))
 
     seed = np.zeros(len(nodes), dtype=float)
     for idx, bid in enumerate(nodes):
@@ -318,14 +303,7 @@ def compute_seed_vector(
             continue
         visitor_values = [float(outcomes.get(int(rid), 0.0)) for rid in visitors]
         shrink = support_shrinkage(n_visit, n_runs, support_shrink_exp)
-        if run_id is not None and run_id in visitors:
-            denom = n_visit - 1
-            if denom <= 0:
-                seed[idx] = 0.0
-                continue
-            ratio = (float(np.sum(visitor_values)) - y_excluded) / denom
-        else:
-            ratio = float(np.mean(visitor_values))
+        ratio = float(np.mean(visitor_values))
         seed[idx] = (ratio - p_base) * shrink
     return seed
 
@@ -339,7 +317,7 @@ def diffuse_reward_field(
     alpha: float,
     n_steps: int,
 ) -> np.ndarray:
-    """Personalised PageRank-style diffusion of the seed vector.
+    """Teleport diffusion of the seed vector over the block graph.
 
         f^{(t+1)} = α · seed  +  (1 − α) · P · f^{(t)}
 

@@ -1,21 +1,18 @@
 #!/usr/bin/env python3
-"""RQ1 — Generate annotation samples for semantic validation of graph structure.
+"""Generate blinded annotation samples for the graph-interpretability checks.
 
 Sampling targets:
-  1. Within vs Across BCC pairs (200 pairs): same BCC vs different BCC step pairs
-     with raw action/observation text for human annotation
-  2. Articulation transitions (100): consecutive steps crossing articulation points,
-     to judge whether phase transitions exist
-  3. Core/Basin block samples (50+50): blocks labelled as core or basin,
-     with representative steps for productive/looping/dead-end classification
+  1. Within vs across BCC pairs (200 + 200): step pairs from the same BCC
+     or from different BCCs, with raw action/observation text
+  2. Articulation transitions (100): consecutive steps crossing an
+     articulation point, to judge whether a strategy or phase change occurs
 
 Output: results/cxcmu/annotation_samples/
-  - bcc_pairs.json          (200 within + 200 across pairs)
+  - bcc_pairs.json                 (200 within + 200 across pairs)
   - articulation_transitions.json  (100 transitions)
-  - block_samples.json      (100 core + basin samples)
 
 Usage:
-    python scripts/89_annotation_sampling.py [--max-tasks N] [--seed 42]
+    python scripts/analysis/annotation_sampling.py [--max-tasks N] [--seed 42]
 """
 from __future__ import annotations
 
@@ -25,15 +22,11 @@ import pickle
 import random
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 from tqdm import tqdm
 
-from tracegraph.graph_construction import nontrivial_blocks
 from tracegraph.reward_field import (
-    build_run_resolved,
-    build_visit_sets,
     nontrivial_block_info,
     reconstruct_run_sequences,
 )
@@ -45,8 +38,6 @@ RESULTS_DIR = Path("results/cxcmu/annotation_samples")
 # Sampling targets
 N_BCC_PAIRS = 200       # 200 within + 200 across
 N_ARTICULATION = 100
-N_CORE_SAMPLES = 50
-N_BASIN_SAMPLES = 50
 
 
 def _load_parsed_steps(bench: str, task_id: str) -> dict[str, list[dict]]:
@@ -265,102 +256,6 @@ def sample_articulation_transitions(
     return results
 
 
-def sample_core_basin_blocks(
-    all_payloads: list[tuple[str, str, dict]],
-    rng: random.Random,
-    n_core: int = N_CORE_SAMPLES,
-    n_basin: int = N_BASIN_SAMPLES,
-) -> list[dict]:
-    """Sample blocks from core and basin regions with representative steps."""
-    core_candidates = []
-    basin_candidates = []
-
-    for bench, task_id, payload in all_payloads:
-        block_meta = nontrivial_block_info(payload)
-        rf = payload.get("reward_field", {})
-        basins_data = payload.get("failure_basins", {}).get("basins", [])
-
-        if not rf:
-            continue
-
-        core_mask = rf.get("core_mask", [])
-        field = rf.get("field", [])
-        rf_nodes = rf.get("nodes", [])
-        rf_node_to_idx = {int(k): v for k, v in rf.get("node_to_idx", {}).items()}
-
-        # Core blocks
-        for bid, meta in block_meta.items():
-            idx = rf_node_to_idx.get(bid)
-            if idx is not None and idx < len(core_mask) and core_mask[idx]:
-                core_candidates.append({
-                    "bench": bench, "task_id": task_id,
-                    "block_id": bid,
-                    "block_type": meta.get("block_type", "unknown"),
-                    "n_nodes": meta.get("n_nodes", 0),
-                    "resolved_purity": meta.get("resolved_purity", 0.0),
-                    "field_value": float(field[idx]) if idx < len(field) else None,
-                    "region": "core",
-                })
-
-        # Basin blocks
-        all_basin_blocks = set()
-        for basin in basins_data:
-            for bid in basin.get("block_ids", []):
-                all_basin_blocks.add(int(bid))
-
-        for bid in all_basin_blocks:
-            if bid in block_meta:
-                meta = block_meta[bid]
-                idx = rf_node_to_idx.get(bid)
-                basin_candidates.append({
-                    "bench": bench, "task_id": task_id,
-                    "block_id": bid,
-                    "block_type": meta.get("block_type", "unknown"),
-                    "n_nodes": meta.get("n_nodes", 0),
-                    "resolved_purity": meta.get("resolved_purity", 0.0),
-                    "field_value": float(field[idx]) if idx is not None and idx < len(field) else None,
-                    "region": "basin",
-                })
-
-    core_sampled = rng.sample(core_candidates, min(n_core, len(core_candidates)))
-    basin_sampled = rng.sample(basin_candidates, min(n_basin, len(basin_candidates)))
-
-    # Enrich with representative step text
-    results = []
-    for item in core_sampled + basin_sampled:
-        bench, task_id, bid = item["bench"], item["task_id"], item["block_id"]
-        parsed_runs = _load_parsed_steps(bench, task_id)
-        gpath = GRAPH_DIR / bench / f"{task_id}.pkl"
-        with open(gpath, "rb") as f:
-            payload = pickle.load(f)
-
-        # Get slices in this block
-        cache = payload.get("role_threshold_cache", {})
-        node_bcc_map = cache.get("node_bcc_map", {})
-        block_slices = []
-        for node_idx_str, bids in node_bcc_map.items():
-            node_idx = int(node_idx_str) if isinstance(node_idx_str, str) else node_idx_str
-            if bid in [int(b) for b in bids]:
-                block_slices.append(node_idx)
-
-        # Sample up to 3 representative steps
-        sample_slices = rng.sample(block_slices, min(3, len(block_slices))) if block_slices else []
-        step_texts = []
-        for s_idx in sample_slices:
-            run_key, pos = _find_run_key_for_slice(payload, s_idx, parsed_runs)
-            if run_key:
-                step_texts.append(_get_step_text(parsed_runs.get(run_key, []), pos))
-
-        results.append({
-            **item,
-            "representative_steps": step_texts,
-            "annotation_question": "What is the nature of activity in this block?",
-            "annotation_options": ["productive_progress", "exploration", "looping_retry", "dead_end", "recovery", "unclear"],
-        })
-
-    return results
-
-
 def main(max_tasks: int | None = None, seed: int = 42):
     rng = random.Random(seed)
     np.random.seed(seed)
@@ -396,12 +291,6 @@ def main(max_tasks: int | None = None, seed: int = 42):
     art_transitions = sample_articulation_transitions(all_payloads, rng)
     print(f"  {len(art_transitions)} transitions sampled")
 
-    print("\n── Sampling core/basin blocks ──")
-    block_samples = sample_core_basin_blocks(all_payloads, rng)
-    n_core_s = sum(1 for s in block_samples if s["region"] == "core")
-    n_basin_s = sum(1 for s in block_samples if s["region"] == "basin")
-    print(f"  {n_core_s} core + {n_basin_s} basin = {len(block_samples)} blocks")
-
     # Save
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -411,13 +300,9 @@ def main(max_tasks: int | None = None, seed: int = 42):
     with open(RESULTS_DIR / "articulation_transitions.json", "w") as f:
         json.dump(art_transitions, f, indent=2, default=str)
 
-    with open(RESULTS_DIR / "block_samples.json", "w") as f:
-        json.dump(block_samples, f, indent=2, default=str)
-
     print(f"\n── Output ──")
     print(f"  {RESULTS_DIR / 'bcc_pairs.json'}")
     print(f"  {RESULTS_DIR / 'articulation_transitions.json'}")
-    print(f"  {RESULTS_DIR / 'block_samples.json'}")
 
 
 if __name__ == "__main__":

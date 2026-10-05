@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""Build a sidecar trap-diagnosis JSON for the RQ4 v2 stronger repair note.
+"""Build the trap-diagnosis sidecar used by the Note arm.
 
-The base trap library (`data/cxcmu/intervention/swebench_trap_library.json`)
-stores only abstract key-sets per trap example. This script classifies
-each example into one of a fixed set of "failure families" based purely
-on its keys, then attaches a ~120-word pattern diagnosis to each family.
+The trap library (`swebench_trap_library.json`) stores only abstract key
+sets per trap example. This script classifies each example into one of six
+fixed failure families based purely on its keys (plus an `unknown`
+fallback), then attaches a short pattern diagnosis to each family.
 
-Crucially, the diagnosis text is GENERAL software-engineering advice
-keyed off the *abstract action pattern* (read-then-stuck, blind-edit-
-then-error, etc.) — it never reads the source task's problem statement,
-gold patch, or verified-test list, so the repair note remains free of
-oracle leakage.
+The diagnosis text is general software-engineering advice keyed off the
+abstract action pattern (read-then-stuck, blind-edit-then-error, etc.); it
+never reads the source task's problem statement, gold patch, or
+verified-test list, so the note carries no oracle information.
 
 Output:
   data/cxcmu/intervention/swebench_trap_diagnosis.json
@@ -29,12 +28,9 @@ RESOURCE_TRAP_PATH = ROOT / "resources/swebench_detector/swebench_trap_library.j
 
 
 FAMILIES: Dict[str, Dict[str, str]] = {
-    # E2 (conservative): the v1/v2/v3 "explore-and-search-elsewhere" advice
-    # caused systematic over-editing on Qwen (it acted on the suggestion to
-    # grep / look at sibling files and then made *extra* destructive edits).
-    # These reformulations instead push the model to VERIFY the current edit
-    # is correct using the narrowest available test, REVERT (not extend) if
-    # not, and AVOID adding new edits before confirmation.
+    # Each family pushes the model to verify the current edit with the
+    # narrowest available test, revert rather than extend it if the evidence
+    # does not support it, and avoid adding new edits before confirmation.
     "blind_edit_error": {
         "label": "blind-edit-then-error",
         "diagnosis": (

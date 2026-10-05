@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
-"""Evaluate SWE-bench Verified patches from a pilot JSONL via the official
-swebench harness.
+"""Evaluate SWE-bench Verified patches from runner JSONL files via the
+official swebench harness.
 
 Pipeline:
-  1. Read pilot_swe_*.jsonl rollouts (each row has instance_id, arm, patch).
+  1. Read rollout JSONL rows written by swe_runner.py (instance_id, arm, patch).
   2. For each arm, write a predictions.jsonl in the standard SWE-bench format:
        {instance_id, model_name_or_path, model_patch}
   3. Run `python -m swebench.harness.run_evaluation` per arm via docker.
-  4. Parse the resulting `*.json` report; merge `resolved` and per-instance
-     reward info back into a results file per arm.
+  4. Parse the resulting report and merge the per-instance `resolved` flag
+     back into one results file per arm.
 
 Usage:
-  python scripts/109_eval_swe_patches.py \\
-      --pilot-glob 'results/cxcmu/intervention/pilot_swe_postfix_s*.jsonl' \\
+  python scripts/intervention/eval_patches.py \\
+      --rollout-glob 'results/cxcmu/intervention/swe_prefix_fork*.jsonl' \\
       --out-dir results/cxcmu/intervention/swe_eval \\
-      --max-workers 4 \\
-      --arms placebo tracegraph shuffled
+      --max-workers 4
 """
 from __future__ import annotations
 
@@ -23,15 +22,13 @@ import argparse
 import glob
 import json
 import os
-import shlex
 import subprocess
 import sys
-import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
 
-def load_pilot(globs: Sequence[str]) -> List[Dict[str, Any]]:
+def load_rollouts(globs: Sequence[str]) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     for g in globs:
         for p in sorted(glob.glob(g)):
@@ -41,9 +38,12 @@ def load_pilot(globs: Sequence[str]) -> List[Dict[str, Any]]:
                     if not line:
                         continue
                     try:
-                        rows.append(json.loads(line))
+                        row = json.loads(line)
                     except json.JSONDecodeError:
-                        pass
+                        continue
+                    if row.get("record_type") == "prefix_probe":
+                        continue
+                    rows.append(row)
     return rows
 
 
@@ -70,33 +70,6 @@ def write_predictions(rows: List[Dict[str, Any]], arm: str, model_tag: str,
             fh.write(json.dumps(rec) + "\n")
             n += 1
     return n
-
-
-def run_harness(predictions_path: Path, run_id: str,
-                dataset: str = "princeton-nlp/SWE-bench_Verified",
-                max_workers: int = 4,
-                namespace: str = "none",
-                cache_level: str = "instance",
-                log_path: Optional[Path] = None) -> int:
-    """Invoke swebench.harness.run_evaluation; return exit code."""
-    env = os.environ.copy()
-    cmd = [
-        sys.executable, "-m", "swebench.harness.run_evaluation",
-        "--predictions_path", str(predictions_path),
-        "--dataset_name", dataset,
-        "--run_id", run_id,
-        "--max_workers", str(max_workers),
-        "--namespace", namespace,
-        "--cache_level", cache_level,
-    ]
-    if log_path is None:
-        proc = subprocess.run(cmd, env=env)
-        return proc.returncode
-    with open(log_path, "ab") as logf:
-        logf.write(f"\n== {' '.join(shlex.quote(c) for c in cmd)} ==\n".encode())
-        logf.flush()
-        proc = subprocess.run(cmd, env=env, stdout=logf, stderr=subprocess.STDOUT)
-        return proc.returncode
 
 
 def find_report(model_tag: str, run_id: str) -> Optional[Path]:
@@ -193,15 +166,17 @@ def parse_per_instance_reports(report_paths: Sequence[Path]) -> Dict[str, Any]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--pilot-glob", nargs="+", required=True)
-    ap.add_argument("--arms", nargs="+", default=["placebo", "tracegraph", "shuffled"])
+    ap.add_argument("--rollout-glob", nargs="+", required=True,
+                    help="Glob(s) of rollout JSONL files written by swe_runner.py.")
+    ap.add_argument("--arms", nargs="+", default=["tg_baseline", "tg_hot", "tg_repair_cool"])
     ap.add_argument("--out-dir", default="results/cxcmu/intervention/swe_eval")
-    ap.add_argument("--run-id-prefix", default="tracegraph_pilot")
+    ap.add_argument("--run-id-prefix", default="tracegraph")
     ap.add_argument("--max-workers", type=int, default=4,
                     help="Parallel swebench docker workers per arm.")
-    ap.add_argument("--harness-timeout-sec", type=int, default=180,
-                    help="Kill a harness subprocess if it still hasn't exited after this many "
-                         "seconds. Per-instance `report.json` files are still harvested.")
+    ap.add_argument("--harness-timeout-sec", type=int, default=0,
+                    help="If > 0, kill a harness subprocess that has not exited after this many "
+                         "seconds; per-instance `report.json` files are still harvested. "
+                         "0 waits for completion.")
     ap.add_argument("--parallel-arms", action="store_true",
                     help="Run arms in parallel (3× docker pressure).")
     ap.add_argument("--skip-existing", action="store_true",
@@ -211,8 +186,8 @@ def main() -> None:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    rows = load_pilot(args.pilot_glob)
-    print(f"Loaded {len(rows)} pilot rows", flush=True)
+    rows = load_rollouts(args.rollout_glob)
+    print(f"Loaded {len(rows)} rollout rows", flush=True)
     if not rows:
         sys.exit("No rollouts to evaluate.")
 
@@ -318,7 +293,7 @@ def main() -> None:
         print(f"  [{arm}] resolved {n_resolved}/{n_total} → {out_info}", flush=True)
 
     # Merge resolved status back into a final per-rollout JSONL
-    merged_path = out_dir / "pilot_swe_with_resolved.jsonl"
+    merged_path = out_dir / "rollouts_with_resolved.jsonl"
     with open(merged_path, "w") as fh:
         for r in rows:
             arm = r.get("arm")
